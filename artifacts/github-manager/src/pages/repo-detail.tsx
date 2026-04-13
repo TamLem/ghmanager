@@ -93,8 +93,17 @@ export default function RepoDetail() {
   }, [auth, authError, setLocation]);
 
   const repoQueryKey = getGetGithubRepoQueryKey(owner, name);
+  const listQueryKey = getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 });
+  const cachedRepo = queryClient.getQueryData<GithubRepo[]>(listQueryKey)?.find(
+    (r) => r.fullName === `${owner}/${name}`
+  );
   const { data: repo, isLoading, error: repoError } = useGetGithubRepo(owner, name, {
-    query: { enabled: !!auth?.authenticated, queryKey: repoQueryKey },
+    query: {
+      enabled: !!auth?.authenticated,
+      queryKey: repoQueryKey,
+      initialData: cachedRepo,
+      initialDataUpdatedAt: 0,
+    },
   });
 
   const updateRepo = useUpdateGithubRepo();
@@ -114,10 +123,11 @@ export default function RepoDetail() {
 
   const handleUpdate = (updates: RepoUpdate) => {
     if (!repo) return;
-    const prevData = queryClient.getQueryData<GithubRepo>(repoQueryKey);
+    const prevDetail = queryClient.getQueryData<GithubRepo>(repoQueryKey);
+    const prevList = queryClient.getQueryData<GithubRepo[]>(listQueryKey);
     queryClient.setQueryData<GithubRepo>(repoQueryKey, (prev) => prev ? { ...prev, ...updates } : prev);
     queryClient.setQueryData<GithubRepo[]>(
-      getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 }),
+      listQueryKey,
       (prev) => prev?.map((r) => r.id === repo.id ? { ...r, ...updates } : r)
     );
     updateRepo.mutate({ owner, repo: name, data: updates }, {
@@ -126,7 +136,8 @@ export default function RepoDetail() {
         toast({ title: "Repository updated" });
       },
       onError: () => {
-        if (prevData) queryClient.setQueryData<GithubRepo>(repoQueryKey, prevData);
+        if (prevDetail) queryClient.setQueryData<GithubRepo>(repoQueryKey, prevDetail);
+        if (prevList) queryClient.setQueryData<GithubRepo[]>(listQueryKey, prevList);
         toast({ title: "Update failed", variant: "destructive" });
       },
     });
