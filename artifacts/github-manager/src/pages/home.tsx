@@ -29,7 +29,7 @@ export default function Home() {
 
   const errorParam = new URLSearchParams(search).get("error");
   const errorMessage = errorParam
-    ? (ERROR_MESSAGES[errorParam] ?? decodeURIComponent(errorParam))
+    ? (ERROR_MESSAGES[errorParam] ?? errorParam)
     : null;
 
   useEffect(() => {
