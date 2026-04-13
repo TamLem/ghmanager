@@ -48,77 +48,77 @@ export function AppSidebar() {
   };
 
   return (
-    <SidebarProvider>
-      <Sidebar variant="inset" className="dark">
-        <SidebarHeader className="py-4">
-          <div className="flex items-center gap-2 px-4">
-            <Github className="h-6 w-6 text-primary" />
-            <span className="font-semibold text-lg tracking-tight">GH Manager</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={location === "/dashboard"}
-                tooltip="Dashboard"
-              >
-                <Link href="/dashboard">
-                  <LayoutDashboard />
-                  <span>Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={location === "/repos"}
-                tooltip="Repositories"
-              >
-                <Link href="/repos">
-                  <BookMarked />
-                  <span>Repositories</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter className="p-4">
-          {authStatus?.authenticated && (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 px-2">
-                {authStatus.avatarUrl ? (
-                  <img src={authStatus.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-muted" />
-                )}
-                <span className="text-sm font-medium">{authStatus.login}</span>
-              </div>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start text-muted-foreground hover:text-foreground" 
-                onClick={handleDisconnect}
-                disabled={disconnectGithub.isPending}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                {disconnectGithub.isPending ? "Disconnecting..." : "Disconnect"}
-              </Button>
+    <Sidebar variant="inset" className="dark">
+      <SidebarHeader className="py-4">
+        <div className="flex items-center gap-2 px-4">
+          <Github className="h-6 w-6 text-primary" />
+          <span className="font-semibold text-lg tracking-tight">GH Manager</span>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              asChild 
+              isActive={location === "/dashboard"}
+              tooltip="Dashboard"
+            >
+              <Link href="/dashboard">
+                <LayoutDashboard />
+                <span>Dashboard</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              asChild 
+              isActive={location === "/repos"}
+              tooltip="Repositories"
+            >
+              <Link href="/repos">
+                <BookMarked />
+                <span>Repositories</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarContent>
+      <SidebarFooter className="p-4">
+        {authStatus?.authenticated && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 px-2">
+              {authStatus.avatarUrl ? (
+                <img src={authStatus.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-muted" />
+              )}
+              <span className="text-sm font-medium">{authStatus.login}</span>
             </div>
-          )}
-        </SidebarFooter>
-      </Sidebar>
-    </SidebarProvider>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-muted-foreground hover:text-foreground" 
+              onClick={handleDisconnect}
+              disabled={disconnectGithub.isPending}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {disconnectGithub.isPending ? "Disconnecting..." : "Disconnect"}
+            </Button>
+          </div>
+        )}
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen w-full bg-background dark text-foreground">
-      <AppSidebar />
-      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden h-screen">
-        {children}
-      </main>
+    <div className="dark text-foreground">
+      <SidebarProvider>
+        <AppSidebar />
+        <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden h-screen">
+          {children}
+        </main>
+      </SidebarProvider>
     </div>
   );
 }
