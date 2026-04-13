@@ -265,6 +265,31 @@ router.post(
   },
 );
 
+router.delete(
+  "/github/repos/:owner/:repo",
+  requireGithubAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const octokit = getOctokitFromSession(req)!;
+    const rawOwner = Array.isArray(req.params.owner) ? req.params.owner[0] : req.params.owner;
+    const rawRepo = Array.isArray(req.params.repo) ? req.params.repo[0] : req.params.repo;
+    const paramsParsed = UpdateGithubRepoParams.safeParse({ owner: rawOwner, repo: rawRepo });
+    if (!paramsParsed.success) {
+      res.status(400).json({ error: paramsParsed.error.message });
+      return;
+    }
+    try {
+      await octokit.rest.repos.delete({
+        owner: paramsParsed.data.owner,
+        repo: paramsParsed.data.repo,
+      });
+      res.json({ success: true });
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
+    }
+  },
+);
+
 router.patch(
   "/github/repos/:owner/:repo",
   requireGithubAuth,

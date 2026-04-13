@@ -5,6 +5,7 @@ import {
   useListGithubRepos,
   useCreateGithubRepo,
   useUpdateGithubRepo,
+  useDeleteGithubRepo,
   getListGithubReposQueryKey,
   getGetGithubAuthStatusQueryKey
 } from "@workspace/api-client-react";
@@ -20,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Search, Star, GitFork, Lock, Globe, Archive, 
-  CircleDot, MoreVertical, Plus, BookOpen, Bug
+  CircleDot, MoreVertical, Plus, BookOpen, Bug, Trash2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,7 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,6 +70,7 @@ export default function Repositories() {
   const { data: repos, isLoading } = useListGithubRepos({ sort: "updated", direction: "desc", per_page: 100 }, { query: { enabled: !!auth?.authenticated, queryKey: getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 }) } });
   const updateRepo = useUpdateGithubRepo();
   const createRepo = useCreateGithubRepo();
+  const deleteRepo = useDeleteGithubRepo();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -80,6 +82,9 @@ export default function Repositories() {
     private: false,
     autoInit: true
   });
+
+  const [deleteTarget, setDeleteTarget] = useState<GithubRepo | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
 
   const repoQueryKey = getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 });
 
@@ -115,6 +120,25 @@ export default function Repositories() {
       },
       onError: (err: Error) => {
         toast({ title: "Creation failed", description: err.message || "Could not create repo", variant: "destructive" });
+      }
+    });
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    const owner = deleteTarget.fullName.split("/")[0];
+    deleteRepo.mutate({ owner, repo: deleteTarget.name }, {
+      onSuccess: () => {
+        queryClient.setQueryData<GithubRepo[]>(
+          repoQueryKey,
+          (prev) => prev?.filter(r => r.id !== deleteTarget.id) ?? []
+        );
+        toast({ title: "Repository deleted", description: `${deleteTarget.fullName} has been permanently deleted.` });
+        setDeleteTarget(null);
+        setDeleteConfirmName("");
+      },
+      onError: () => {
+        toast({ title: "Delete failed", description: "Could not delete repository. Make sure your token has the delete_repo scope.", variant: "destructive" });
       }
     });
   };
@@ -188,7 +212,7 @@ export default function Repositories() {
                 return (
                   <Card key={repo.id} className="flex flex-col sm:flex-row gap-4 p-5 hover:border-primary/50 transition-colors border-border bg-card">
                     <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <a href={repo.htmlUrl} target="_blank" rel="noreferrer" className="text-lg font-semibold text-primary hover:underline truncate">
                           {repo.name}
                         </a>
@@ -196,6 +220,12 @@ export default function Repositories() {
                           {repo.private ? <Lock className="w-3 h-3 mr-1" /> : <Globe className="w-3 h-3 mr-1" />}
                           {repo.private ? "Private" : "Public"}
                         </Badge>
+                        {repo.fork && (
+                          <Badge variant="outline" className="shrink-0 text-sky-400 border-sky-400/30">
+                            <GitFork className="w-3 h-3 mr-1" />
+                            Forked
+                          </Badge>
+                        )}
                         {repo.archived && <Badge variant="secondary" className="shrink-0"><Archive className="w-3 h-3 mr-1" /> Archived</Badge>}
                       </div>
                       
@@ -226,12 +256,19 @@ export default function Repositories() {
                             <MoreVertical className="w-4 h-4 text-muted-foreground" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleUpdate(repo.id, owner, repo.name, { private: !repo.private })}>
-                            {repo.private ? "Make Public" : "Make Private"}
-                          </DropdownMenuItem>
+                          {!repo.fork ? (
+                            <DropdownMenuItem onClick={() => handleUpdate(repo.id, owner, repo.name, { private: !repo.private })}>
+                              {repo.private ? "Make Public" : "Make Private"}
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem disabled className="text-muted-foreground/50 cursor-not-allowed">
+                              <Lock className="w-3.5 h-3.5 mr-2 opacity-40" />
+                              Can't make fork private
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => handleUpdate(repo.id, owner, repo.name, { archived: !repo.archived })}>
                             {repo.archived ? "Unarchive" : "Archive"}
                           </DropdownMenuItem>
@@ -241,6 +278,14 @@ export default function Repositories() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleUpdate(repo.id, owner, repo.name, { hasWiki: !repo.hasWiki })}>
                             {repo.hasWiki ? "Disable Wiki" : "Enable Wiki"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                            onClick={() => { setDeleteTarget(repo); setDeleteConfirmName(""); }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mr-2" />
+                            Delete repository
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -252,6 +297,42 @@ export default function Repositories() {
           </div>
         </div>
       </div>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmName(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-500">Delete repository</DialogTitle>
+            <DialogDescription>
+              This action <strong>cannot be undone</strong>. This will permanently delete the{" "}
+              <strong>{deleteTarget?.fullName}</strong> repository, including all its content, issues, and history.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <Label className="text-sm text-muted-foreground">
+              Type <span className="font-mono font-bold text-foreground">{deleteTarget?.name}</span> to confirm deletion
+            </Label>
+            <Input
+              value={deleteConfirmName}
+              onChange={e => setDeleteConfirmName(e.target.value)}
+              placeholder={deleteTarget?.name}
+              className="font-mono"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteConfirmName(""); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmName !== deleteTarget?.name || deleteRepo.isPending}
+              onClick={handleDelete}
+            >
+              {deleteRepo.isPending ? "Deleting..." : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarLayout>
   );
 }

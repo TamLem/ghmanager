@@ -709,6 +709,92 @@ export const useCreateGithubRepo = <
 };
 
 /**
+ * Permanently deletes a repository. Cannot be undone.
+ * @summary Delete a GitHub repository
+ */
+export const getDeleteGithubRepoUrl = (owner: string, repo: string) => {
+  return `/api/github/repos/${owner}/${repo}`;
+};
+
+export const deleteGithubRepo = async (
+  owner: string,
+  repo: string,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getDeleteGithubRepoUrl(owner, repo), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteGithubRepoMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteGithubRepo>>,
+    TError,
+    { owner: string; repo: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteGithubRepo>>,
+  TError,
+  { owner: string; repo: string },
+  TContext
+> => {
+  const mutationKey = ["deleteGithubRepo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteGithubRepo>>,
+    { owner: string; repo: string }
+  > = (props) => {
+    const { owner, repo } = props ?? {};
+
+    return deleteGithubRepo(owner, repo, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteGithubRepoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteGithubRepo>>
+>;
+
+export type DeleteGithubRepoMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Delete a GitHub repository
+ */
+export const useDeleteGithubRepo = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteGithubRepo>>,
+    TError,
+    { owner: string; repo: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteGithubRepo>>,
+  TError,
+  { owner: string; repo: string },
+  TContext
+> => {
+  return useMutation(getDeleteGithubRepoMutationOptions(options));
+};
+
+/**
  * Updates repository settings (visibility, archive state, features)
  * @summary Update a GitHub repository
  */

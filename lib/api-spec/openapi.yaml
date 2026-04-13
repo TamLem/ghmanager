@@ -195,6 +195,41 @@ paths:
                 $ref: "#/components/schemas/ApiError"
 
   /github/repos/{owner}/{repo}:
+    delete:
+      operationId: deleteGithubRepo
+      tags: [github]
+      summary: Delete a GitHub repository
+      description: Permanently deletes a repository. Cannot be undone.
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Repository deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
     patch:
       operationId: updateGithubRepo
       tags: [github]

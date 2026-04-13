@@ -153,6 +153,19 @@ export const CreateGithubRepoBody = zod.object({
 });
 
 /**
+ * Permanently deletes a repository. Cannot be undone.
+ * @summary Delete a GitHub repository
+ */
+export const DeleteGithubRepoParams = zod.object({
+  owner: zod.coerce.string(),
+  repo: zod.coerce.string(),
+});
+
+export const DeleteGithubRepoResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
  * Updates repository settings (visibility, archive state, features)
  * @summary Update a GitHub repository
  */
