@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import type { Request, Response } from "express";
-import { getOctokitFromSession, createOctokit } from "../../lib/github-client";
+import { getOctokitFromSession, createOctokit, requireGithubAuth } from "../../lib/github-client";
 import {
   GetGithubProfileResponse,
   UpdateGithubProfileBody,
@@ -11,6 +11,7 @@ import {
   GetGithubStatsResponse,
   GetGithubAuthStatusResponse,
   ListGithubReposResponse,
+  ListGithubReposResponseItem,
   UpdateGithubProfileResponse,
   UpdateGithubRepoResponse,
   ConnectGithubBody,
@@ -18,28 +19,16 @@ import {
   GetGithubActivityResponse,
   ConnectGithubResponse,
   DisconnectGithubResponse,
-  ListGithubReposResponseItem,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
 type OctokitError = { status?: number; message?: string };
 
-function isAuthError(err: unknown): boolean {
-  const e = err as OctokitError;
-  return e.status === 401 || e.status === 403;
-}
-
-function clearSessionToken(req: Request): void {
-  if (req.session) {
-    req.session.githubToken = undefined;
-  }
-}
-
 function handleOctokitError(err: unknown, req: Request, res: Response): boolean {
   const e = err as OctokitError;
-  if (isAuthError(err)) {
-    clearSessionToken(req);
+  if (e.status === 401 || e.status === 403) {
+    if (req.session) req.session.githubToken = undefined;
     res.status(401).json({ error: "GitHub session expired or invalid. Please reconnect." });
     return true;
   }
@@ -107,31 +96,16 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const token = req.session?.githubToken;
     if (!token) {
-      const parsed = GetGithubAuthStatusResponse.parse({
-        authenticated: false,
-        login: null,
-        avatarUrl: null,
-      });
-      res.json(parsed);
+      res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
       return;
     }
     try {
       const octokit = createOctokit(token);
       const { data } = await octokit.rest.users.getAuthenticated();
-      const parsed = GetGithubAuthStatusResponse.parse({
-        authenticated: true,
-        login: data.login,
-        avatarUrl: data.avatar_url,
-      });
-      res.json(parsed);
+      res.json(GetGithubAuthStatusResponse.parse({ authenticated: true, login: data.login, avatarUrl: data.avatar_url }));
     } catch {
-      clearSessionToken(req);
-      const parsed = GetGithubAuthStatusResponse.parse({
-        authenticated: false,
-        login: null,
-        avatarUrl: null,
-      });
-      res.json(parsed);
+      if (req.session) req.session.githubToken = undefined;
+      res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
     }
   },
 );
@@ -148,12 +122,7 @@ router.post(
       const octokit = createOctokit(parsed.data.token);
       const { data } = await octokit.rest.users.getAuthenticated();
       req.session.githubToken = parsed.data.token;
-      const response = ConnectGithubResponse.parse({
-        authenticated: true,
-        login: data.login,
-        avatarUrl: data.avatar_url,
-      });
-      res.json(response);
+      res.json(ConnectGithubResponse.parse({ authenticated: true, login: data.login, avatarUrl: data.avatar_url }));
     } catch {
       res.status(401).json({ error: "Invalid GitHub token" });
     }
@@ -163,23 +132,19 @@ router.post(
 router.post(
   "/github/auth/disconnect",
   async (req: Request, res: Response): Promise<void> => {
-    clearSessionToken(req);
-    const response = DisconnectGithubResponse.parse({ success: true });
-    res.json(response);
+    if (req.session) req.session.githubToken = undefined;
+    res.json(DisconnectGithubResponse.parse({ success: true }));
   },
 );
 
 router.get(
   "/github/profile",
+  requireGithubAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const octokit = getOctokitFromSession(req);
-    if (!octokit) {
-      res.status(401).json({ error: "Not authenticated with GitHub" });
-      return;
-    }
+    const octokit = getOctokitFromSession(req)!;
     try {
       const { data } = await octokit.rest.users.getAuthenticated();
-      const parsed = GetGithubProfileResponse.parse({
+      res.json(GetGithubProfileResponse.parse({
         login: data.login,
         id: data.id,
         avatarUrl: data.avatar_url,
@@ -195,8 +160,7 @@ router.get(
         following: data.following,
         createdAt: data.created_at,
         htmlUrl: data.html_url,
-      });
-      res.json(parsed);
+      }));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;
@@ -206,12 +170,9 @@ router.get(
 
 router.patch(
   "/github/profile",
+  requireGithubAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const octokit = getOctokitFromSession(req);
-    if (!octokit) {
-      res.status(401).json({ error: "Not authenticated with GitHub" });
-      return;
-    }
+    const octokit = getOctokitFromSession(req)!;
     const parsed = UpdateGithubProfileBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.message });
@@ -227,7 +188,7 @@ router.patch(
         twitter_username: parsed.data.twitterUsername,
         company: parsed.data.company,
       });
-      const response = UpdateGithubProfileResponse.parse({
+      res.json(UpdateGithubProfileResponse.parse({
         login: data.login,
         id: data.id,
         avatarUrl: data.avatar_url,
@@ -243,8 +204,7 @@ router.patch(
         following: data.following,
         createdAt: data.created_at,
         htmlUrl: data.html_url,
-      });
-      res.json(response);
+      }));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;
@@ -254,12 +214,9 @@ router.patch(
 
 router.get(
   "/github/repos",
+  requireGithubAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const octokit = getOctokitFromSession(req);
-    if (!octokit) {
-      res.status(401).json({ error: "Not authenticated with GitHub" });
-      return;
-    }
+    const octokit = getOctokitFromSession(req)!;
     const params = ListGithubReposQueryParams.safeParse(req.query);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
@@ -267,19 +224,13 @@ router.get(
     }
     try {
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-        sort: params.data.sort as
-          | "created"
-          | "updated"
-          | "pushed"
-          | "full_name"
-          | undefined,
+        sort: params.data.sort as "created" | "updated" | "pushed" | "full_name" | undefined,
         direction: params.data.direction as "asc" | "desc" | undefined,
         per_page: params.data.per_page ? Number(params.data.per_page) : 100,
         page: params.data.page ? Number(params.data.page) : 1,
         visibility: "all",
       });
-      const response = ListGithubReposResponse.parse(data.map(mapRepo));
-      res.json(response);
+      res.json(ListGithubReposResponse.parse(data.map(mapRepo)));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;
@@ -289,12 +240,9 @@ router.get(
 
 router.post(
   "/github/repos",
+  requireGithubAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const octokit = getOctokitFromSession(req);
-    if (!octokit) {
-      res.status(401).json({ error: "Not authenticated with GitHub" });
-      return;
-    }
+    const octokit = getOctokitFromSession(req)!;
     const parsed = CreateGithubRepoBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.message });
@@ -309,8 +257,7 @@ router.post(
         gitignore_template: parsed.data.gitignoreTemplate,
         license_template: parsed.data.licenseTemplate,
       });
-      const response = ListGithubReposResponseItem.parse(mapRepo(data as Parameters<typeof mapRepo>[0]));
-      res.status(201).json(response);
+      res.status(201).json(ListGithubReposResponseItem.parse(mapRepo(data as Parameters<typeof mapRepo>[0])));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;
@@ -320,22 +267,12 @@ router.post(
 
 router.patch(
   "/github/repos/:owner/:repo",
+  requireGithubAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const octokit = getOctokitFromSession(req);
-    if (!octokit) {
-      res.status(401).json({ error: "Not authenticated with GitHub" });
-      return;
-    }
-    const rawOwner = Array.isArray(req.params.owner)
-      ? req.params.owner[0]
-      : req.params.owner;
-    const rawRepo = Array.isArray(req.params.repo)
-      ? req.params.repo[0]
-      : req.params.repo;
-    const paramsParsed = UpdateGithubRepoParams.safeParse({
-      owner: rawOwner,
-      repo: rawRepo,
-    });
+    const octokit = getOctokitFromSession(req)!;
+    const rawOwner = Array.isArray(req.params.owner) ? req.params.owner[0] : req.params.owner;
+    const rawRepo = Array.isArray(req.params.repo) ? req.params.repo[0] : req.params.repo;
+    const paramsParsed = UpdateGithubRepoParams.safeParse({ owner: rawOwner, repo: rawRepo });
     if (!paramsParsed.success) {
       res.status(400).json({ error: paramsParsed.error.message });
       return;
@@ -357,8 +294,7 @@ router.patch(
         has_wiki: bodyParsed.data.hasWiki,
         has_projects: bodyParsed.data.hasProjects,
       });
-      const response = UpdateGithubRepoResponse.parse(mapRepo(data as Parameters<typeof mapRepo>[0]));
-      res.json(response);
+      res.json(UpdateGithubRepoResponse.parse(mapRepo(data as Parameters<typeof mapRepo>[0])));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;
@@ -368,12 +304,9 @@ router.patch(
 
 router.get(
   "/github/stats",
+  requireGithubAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const octokit = getOctokitFromSession(req);
-    if (!octokit) {
-      res.status(401).json({ error: "Not authenticated with GitHub" });
-      return;
-    }
+    const octokit = getOctokitFromSession(req)!;
     try {
       const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
         per_page: 100,
@@ -412,7 +345,7 @@ router.get(
           percentage: totalWithLang > 0 ? Math.round((count / totalWithLang) * 100) : 0,
         }));
 
-      const response = GetGithubStatsResponse.parse({
+      res.json(GetGithubStatsResponse.parse({
         totalRepos: repos.length,
         totalStars,
         totalForks,
@@ -424,8 +357,7 @@ router.get(
         mostStarredRepo: mostStarred
           ? mapRepo(mostStarred as Parameters<typeof mapRepo>[0])
           : undefined,
-      });
-      res.json(response);
+      }));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;
@@ -435,14 +367,15 @@ router.get(
 
 router.get(
   "/github/activity",
+  requireGithubAuth,
   async (req: Request, res: Response): Promise<void> => {
-    const octokit = getOctokitFromSession(req);
-    if (!octokit) {
-      res.status(401).json({ error: "Not authenticated with GitHub" });
+    const octokit = getOctokitFromSession(req)!;
+    const params = GetGithubActivityQueryParams.safeParse(req.query);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
       return;
     }
-    const params = GetGithubActivityQueryParams.safeParse(req.query);
-    const perPage = params.success && params.data.per_page ? Number(params.data.per_page) : 20;
+    const perPage = params.data.per_page ? Number(params.data.per_page) : 20;
 
     try {
       const { data: user } = await octokit.rest.users.getAuthenticated();
@@ -494,8 +427,7 @@ router.get(
         description: describeEvent(event),
       }));
 
-      const response = GetGithubActivityResponse.parse(mapped);
-      res.json(response);
+      res.json(GetGithubActivityResponse.parse(mapped));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;

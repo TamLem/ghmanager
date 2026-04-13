@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import type { Request } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 declare module "express-session" {
   interface SessionData {
@@ -15,4 +15,12 @@ export function getOctokitFromSession(req: Request): Octokit | null {
 
 export function createOctokit(token: string): Octokit {
   return new Octokit({ auth: token });
+}
+
+export function requireGithubAuth(req: Request, res: Response, next: NextFunction): void {
+  if (!req.session?.githubToken) {
+    res.status(401).json({ error: "Not authenticated with GitHub" });
+    return;
+  }
+  next();
 }
