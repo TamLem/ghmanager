@@ -49,7 +49,7 @@ app.use(
   cookieSession({
     name: "session",
     keys: [sessionSecret ?? "dev-secret-change-in-prod"],
-    maxAge: 30 * 24 * 60 * 60 * 1000,
+    maxAge: 10 * 365 * 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
