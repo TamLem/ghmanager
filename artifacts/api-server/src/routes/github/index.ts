@@ -15,11 +15,40 @@ import {
   UpdateGithubRepoResponse,
   ConnectGithubBody,
   GetGithubActivityQueryParams,
+  GetGithubActivityResponse,
   ConnectGithubResponse,
   DisconnectGithubResponse,
+  ListGithubReposResponseItem,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+type OctokitError = { status?: number; message?: string };
+
+function isAuthError(err: unknown): boolean {
+  const e = err as OctokitError;
+  return e.status === 401 || e.status === 403;
+}
+
+function clearSessionToken(req: Request): void {
+  if (req.session) {
+    req.session.githubToken = undefined;
+  }
+}
+
+function handleOctokitError(err: unknown, req: Request, res: Response): boolean {
+  const e = err as OctokitError;
+  if (isAuthError(err)) {
+    clearSessionToken(req);
+    res.status(401).json({ error: "GitHub session expired or invalid. Please reconnect." });
+    return true;
+  }
+  if (e.status === 404) {
+    res.status(404).json({ error: "Resource not found" });
+    return true;
+  }
+  return false;
+}
 
 function mapRepo(r: {
   id: number;
@@ -96,7 +125,7 @@ router.get(
       });
       res.json(parsed);
     } catch {
-      req.session.githubToken = undefined;
+      clearSessionToken(req);
       const parsed = GetGithubAuthStatusResponse.parse({
         authenticated: false,
         login: null,
@@ -134,7 +163,7 @@ router.post(
 router.post(
   "/github/auth/disconnect",
   async (req: Request, res: Response): Promise<void> => {
-    req.session.githubToken = undefined;
+    clearSessionToken(req);
     const response = DisconnectGithubResponse.parse({ success: true });
     res.json(response);
   },
@@ -148,25 +177,30 @@ router.get(
       res.status(401).json({ error: "Not authenticated with GitHub" });
       return;
     }
-    const { data } = await octokit.rest.users.getAuthenticated();
-    const parsed = GetGithubProfileResponse.parse({
-      login: data.login,
-      id: data.id,
-      avatarUrl: data.avatar_url,
-      name: data.name ?? null,
-      company: data.company ?? null,
-      blog: data.blog ?? null,
-      location: data.location ?? null,
-      email: data.email ?? null,
-      bio: data.bio ?? null,
-      twitterUsername: data.twitter_username ?? null,
-      publicRepos: data.public_repos,
-      followers: data.followers,
-      following: data.following,
-      createdAt: data.created_at,
-      htmlUrl: data.html_url,
-    });
-    res.json(parsed);
+    try {
+      const { data } = await octokit.rest.users.getAuthenticated();
+      const parsed = GetGithubProfileResponse.parse({
+        login: data.login,
+        id: data.id,
+        avatarUrl: data.avatar_url,
+        name: data.name ?? null,
+        company: data.company ?? null,
+        blog: data.blog ?? null,
+        location: data.location ?? null,
+        email: data.email ?? null,
+        bio: data.bio ?? null,
+        twitterUsername: data.twitter_username ?? null,
+        publicRepos: data.public_repos,
+        followers: data.followers,
+        following: data.following,
+        createdAt: data.created_at,
+        htmlUrl: data.html_url,
+      });
+      res.json(parsed);
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
+    }
   },
 );
 
@@ -183,33 +217,38 @@ router.patch(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const { data } = await octokit.rest.users.updateAuthenticated({
-      name: parsed.data.name,
-      email: parsed.data.email,
-      blog: parsed.data.blog,
-      location: parsed.data.location,
-      bio: parsed.data.bio,
-      twitter_username: parsed.data.twitterUsername,
-      company: parsed.data.company,
-    });
-    const response = UpdateGithubProfileResponse.parse({
-      login: data.login,
-      id: data.id,
-      avatarUrl: data.avatar_url,
-      name: data.name ?? null,
-      company: data.company ?? null,
-      blog: data.blog ?? null,
-      location: data.location ?? null,
-      email: data.email ?? null,
-      bio: data.bio ?? null,
-      twitterUsername: data.twitter_username ?? null,
-      publicRepos: data.public_repos,
-      followers: data.followers,
-      following: data.following,
-      createdAt: data.created_at,
-      htmlUrl: data.html_url,
-    });
-    res.json(response);
+    try {
+      const { data } = await octokit.rest.users.updateAuthenticated({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        blog: parsed.data.blog,
+        location: parsed.data.location,
+        bio: parsed.data.bio,
+        twitter_username: parsed.data.twitterUsername,
+        company: parsed.data.company,
+      });
+      const response = UpdateGithubProfileResponse.parse({
+        login: data.login,
+        id: data.id,
+        avatarUrl: data.avatar_url,
+        name: data.name ?? null,
+        company: data.company ?? null,
+        blog: data.blog ?? null,
+        location: data.location ?? null,
+        email: data.email ?? null,
+        bio: data.bio ?? null,
+        twitterUsername: data.twitter_username ?? null,
+        publicRepos: data.public_repos,
+        followers: data.followers,
+        following: data.following,
+        createdAt: data.created_at,
+        htmlUrl: data.html_url,
+      });
+      res.json(response);
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
+    }
   },
 );
 
@@ -226,23 +265,25 @@ router.get(
       res.status(400).json({ error: params.error.message });
       return;
     }
-    const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-      sort: params.data.sort as
-        | "created"
-        | "updated"
-        | "pushed"
-        | "full_name"
-        | undefined,
-      direction: params.data.direction as "asc" | "desc" | undefined,
-      per_page: params.data.per_page
-        ? Number(params.data.per_page)
-        : 100,
-      page: params.data.page ? Number(params.data.page) : 1,
-      visibility: "all",
-    });
-    const mapped = data.map(mapRepo);
-    const response = ListGithubReposResponse.parse(mapped);
-    res.json(response);
+    try {
+      const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+        sort: params.data.sort as
+          | "created"
+          | "updated"
+          | "pushed"
+          | "full_name"
+          | undefined,
+        direction: params.data.direction as "asc" | "desc" | undefined,
+        per_page: params.data.per_page ? Number(params.data.per_page) : 100,
+        page: params.data.page ? Number(params.data.page) : 1,
+        visibility: "all",
+      });
+      const response = ListGithubReposResponse.parse(data.map(mapRepo));
+      res.json(response);
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
+    }
   },
 );
 
@@ -259,16 +300,21 @@ router.post(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const { data } = await octokit.rest.repos.createForAuthenticatedUser({
-      name: parsed.data.name,
-      description: parsed.data.description,
-      private: parsed.data.private ?? false,
-      auto_init: parsed.data.autoInit ?? true,
-      gitignore_template: parsed.data.gitignoreTemplate,
-      license_template: parsed.data.licenseTemplate,
-    });
-    const response = mapRepo(data as Parameters<typeof mapRepo>[0]);
-    res.status(201).json(response);
+    try {
+      const { data } = await octokit.rest.repos.createForAuthenticatedUser({
+        name: parsed.data.name,
+        description: parsed.data.description,
+        private: parsed.data.private ?? false,
+        auto_init: parsed.data.autoInit ?? true,
+        gitignore_template: parsed.data.gitignoreTemplate,
+        license_template: parsed.data.licenseTemplate,
+      });
+      const response = ListGithubReposResponseItem.parse(mapRepo(data as Parameters<typeof mapRepo>[0]));
+      res.status(201).json(response);
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
+    }
   },
 );
 
@@ -313,12 +359,8 @@ router.patch(
       });
       const response = UpdateGithubRepoResponse.parse(mapRepo(data as Parameters<typeof mapRepo>[0]));
       res.json(response);
-    } catch (err: unknown) {
-      const e = err as { status?: number };
-      if (e.status === 404) {
-        res.status(404).json({ error: "Repository not found" });
-        return;
-      }
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
       throw err;
     }
   },
@@ -332,64 +374,62 @@ router.get(
       res.status(401).json({ error: "Not authenticated with GitHub" });
       return;
     }
-    const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
-      per_page: 100,
-      visibility: "all",
-    });
-    const langMap = new Map<string, number>();
-    let totalStars = 0;
-    let totalForks = 0;
-    let totalWatchers = 0;
-    let publicRepos = 0;
-    let privateRepos = 0;
-    let archivedRepos = 0;
-    let mostStarred = repos[0];
+    try {
+      const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
+        per_page: 100,
+        visibility: "all",
+      });
+      const langMap = new Map<string, number>();
+      let totalStars = 0;
+      let totalForks = 0;
+      let totalWatchers = 0;
+      let publicRepos = 0;
+      let privateRepos = 0;
+      let archivedRepos = 0;
+      let mostStarred = repos[0];
 
-    for (const repo of repos) {
-      totalStars += repo.stargazers_count ?? 0;
-      totalForks += repo.forks_count ?? 0;
-      totalWatchers += repo.watchers_count ?? 0;
-      if (repo.private) privateRepos++;
-      else publicRepos++;
-      if (repo.archived) archivedRepos++;
-      if (repo.language) {
-        langMap.set(repo.language, (langMap.get(repo.language) ?? 0) + 1);
+      for (const repo of repos) {
+        totalStars += repo.stargazers_count ?? 0;
+        totalForks += repo.forks_count ?? 0;
+        totalWatchers += repo.watchers_count ?? 0;
+        if (repo.private) privateRepos++;
+        else publicRepos++;
+        if (repo.archived) archivedRepos++;
+        if (repo.language) {
+          langMap.set(repo.language, (langMap.get(repo.language) ?? 0) + 1);
+        }
+        if ((repo.stargazers_count ?? 0) > (mostStarred?.stargazers_count ?? 0)) {
+          mostStarred = repo;
+        }
       }
-      if (
-        (repo.stargazers_count ?? 0) >
-        (mostStarred?.stargazers_count ?? 0)
-      ) {
-        mostStarred = repo;
-      }
+
+      const totalWithLang = Array.from(langMap.values()).reduce((a, b) => a + b, 0);
+      const languageBreakdown = Array.from(langMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([language, count]) => ({
+          language,
+          count,
+          percentage: totalWithLang > 0 ? Math.round((count / totalWithLang) * 100) : 0,
+        }));
+
+      const response = GetGithubStatsResponse.parse({
+        totalRepos: repos.length,
+        totalStars,
+        totalForks,
+        totalWatchers,
+        publicRepos,
+        privateRepos,
+        archivedRepos,
+        languageBreakdown,
+        mostStarredRepo: mostStarred
+          ? mapRepo(mostStarred as Parameters<typeof mapRepo>[0])
+          : undefined,
+      });
+      res.json(response);
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
     }
-
-    const totalWithLang = Array.from(langMap.values()).reduce(
-      (a, b) => a + b,
-      0,
-    );
-    const languageBreakdown = Array.from(langMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([language, count]) => ({
-        language,
-        count,
-        percentage:
-          totalWithLang > 0
-            ? Math.round((count / totalWithLang) * 100)
-            : 0,
-      }));
-
-    const response = GetGithubStatsResponse.parse({
-      totalRepos: repos.length,
-      totalStars,
-      totalForks,
-      totalWatchers,
-      publicRepos,
-      privateRepos,
-      archivedRepos,
-      languageBreakdown,
-      mostStarredRepo: mostStarred ? mapRepo(mostStarred as Parameters<typeof mapRepo>[0]) : undefined,
-    });
-    res.json(response);
   },
 );
 
@@ -404,56 +444,62 @@ router.get(
     const params = GetGithubActivityQueryParams.safeParse(req.query);
     const perPage = params.success && params.data.per_page ? Number(params.data.per_page) : 20;
 
-    const { data: user } = await octokit.rest.users.getAuthenticated();
-    const { data: events } = await octokit.rest.activity.listEventsForAuthenticatedUser({
-      username: user.login,
-      per_page: perPage,
-    });
+    try {
+      const { data: user } = await octokit.rest.users.getAuthenticated();
+      const { data: events } = await octokit.rest.activity.listEventsForAuthenticatedUser({
+        username: user.login,
+        per_page: perPage,
+      });
 
-    type GithubEvent = typeof events[number];
+      type GithubEvent = typeof events[number];
 
-    function describeEvent(event: GithubEvent): string {
-      const payload = event.payload as Record<string, unknown>;
-      switch (event.type) {
-        case "PushEvent": {
-          const commits = (payload.commits as unknown[]) ?? [];
-          return `Pushed ${commits.length} commit${commits.length !== 1 ? "s" : ""}`;
+      function describeEvent(event: GithubEvent): string {
+        const payload = event.payload as Record<string, unknown>;
+        switch (event.type) {
+          case "PushEvent": {
+            const commits = (payload.commits as unknown[]) ?? [];
+            return `Pushed ${commits.length} commit${commits.length !== 1 ? "s" : ""}`;
+          }
+          case "PullRequestEvent":
+            return `${String(payload.action ?? "").replace(/_/g, " ")} pull request`;
+          case "IssuesEvent":
+            return `${String(payload.action ?? "").replace(/_/g, " ")} issue`;
+          case "CreateEvent":
+            return `Created ${String(payload.ref_type ?? "repository")}${payload.ref ? ` "${String(payload.ref)}"` : ""}`;
+          case "DeleteEvent":
+            return `Deleted ${String(payload.ref_type ?? "branch")} "${String(payload.ref ?? "")}"`;
+          case "ForkEvent":
+            return `Forked repository`;
+          case "WatchEvent":
+            return `Starred repository`;
+          case "IssueCommentEvent":
+            return `Commented on issue`;
+          case "PullRequestReviewEvent":
+            return `Reviewed pull request`;
+          case "ReleaseEvent":
+            return `${String(payload.action ?? "published")} release`;
+          case "MemberEvent":
+            return `${String(payload.action ?? "added")} member`;
+          default:
+            return event.type?.replace(/Event$/, "") ?? "Activity";
         }
-        case "PullRequestEvent":
-          return `${String(payload.action ?? "").replace(/_/g, " ")} pull request`;
-        case "IssuesEvent":
-          return `${String(payload.action ?? "").replace(/_/g, " ")} issue`;
-        case "CreateEvent":
-          return `Created ${String(payload.ref_type ?? "repository")}${payload.ref ? ` "${String(payload.ref)}"` : ""}`;
-        case "DeleteEvent":
-          return `Deleted ${String(payload.ref_type ?? "branch")} "${String(payload.ref ?? "")}"`;
-        case "ForkEvent":
-          return `Forked repository`;
-        case "WatchEvent":
-          return `Starred repository`;
-        case "IssueCommentEvent":
-          return `Commented on issue`;
-        case "PullRequestReviewEvent":
-          return `Reviewed pull request`;
-        case "ReleaseEvent":
-          return `${String(payload.action ?? "published")} release`;
-        case "MemberEvent":
-          return `${String(payload.action ?? "added")} member`;
-        default:
-          return event.type?.replace(/Event$/, "") ?? "Activity";
       }
+
+      const mapped = events.map((event) => ({
+        id: event.id,
+        type: event.type ?? null,
+        repoName: event.repo?.name ?? "",
+        repoUrl: `https://github.com/${event.repo?.name ?? ""}`,
+        createdAt: event.created_at ?? new Date().toISOString(),
+        description: describeEvent(event),
+      }));
+
+      const response = GetGithubActivityResponse.parse(mapped);
+      res.json(response);
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
     }
-
-    const mapped = events.map((event) => ({
-      id: event.id,
-      type: event.type ?? null,
-      repoName: event.repo?.name ?? "",
-      repoUrl: `https://github.com/${event.repo?.name ?? ""}`,
-      createdAt: event.created_at ?? new Date().toISOString(),
-      description: describeEvent(event),
-    }));
-
-    res.json(mapped);
   },
 );
 
