@@ -21,6 +21,7 @@ import type {
   CreateGithubRepoBody,
   GetGithubActivityParams,
   GithubActivityEvent,
+  GithubAuthCallbackParams,
   GithubAuthStatus,
   GithubProfile,
   GithubRepo,
@@ -185,6 +186,182 @@ export function useGetGithubAuthStatus<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetGithubAuthStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Browser-redirect endpoint. Generates a CSRF state token, stores it in the session cookie, and redirects the browser to the GitHub OAuth authorization page. Not intended to be called via fetch/XHR.
+
+ * @summary Initiate GitHub OAuth login
+ */
+export const getGithubAuthLoginUrl = () => {
+  return `/api/github/auth/login`;
+};
+
+export const githubAuthLogin = async (
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getGithubAuthLoginUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGithubAuthLoginQueryKey = () => {
+  return [`/api/github/auth/login`] as const;
+};
+
+export const getGithubAuthLoginQueryOptions = <
+  TData = Awaited<ReturnType<typeof githubAuthLogin>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof githubAuthLogin>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGithubAuthLoginQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof githubAuthLogin>>> = ({
+    signal,
+  }) => githubAuthLogin({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof githubAuthLogin>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GithubAuthLoginQueryResult = NonNullable<
+  Awaited<ReturnType<typeof githubAuthLogin>>
+>;
+export type GithubAuthLoginQueryError = ErrorType<void>;
+
+/**
+ * @summary Initiate GitHub OAuth login
+ */
+
+export function useGithubAuthLogin<
+  TData = Awaited<ReturnType<typeof githubAuthLogin>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof githubAuthLogin>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGithubAuthLoginQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Browser-redirect endpoint called by GitHub after the user authorizes the app. Validates CSRF state, exchanges the authorization code for an access token, stores the encrypted token in the session cookie, and redirects to /dashboard. Not intended to be called via fetch/XHR.
+
+ * @summary GitHub OAuth callback
+ */
+export const getGithubAuthCallbackUrl = (params?: GithubAuthCallbackParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/github/auth/callback?${stringifiedParams}`
+    : `/api/github/auth/callback`;
+};
+
+export const githubAuthCallback = async (
+  params?: GithubAuthCallbackParams,
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getGithubAuthCallbackUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGithubAuthCallbackQueryKey = (
+  params?: GithubAuthCallbackParams,
+) => {
+  return [`/api/github/auth/callback`, ...(params ? [params] : [])] as const;
+};
+
+export const getGithubAuthCallbackQueryOptions = <
+  TData = Awaited<ReturnType<typeof githubAuthCallback>>,
+  TError = ErrorType<void>,
+>(
+  params?: GithubAuthCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof githubAuthCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGithubAuthCallbackQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof githubAuthCallback>>
+  > = ({ signal }) => githubAuthCallback(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof githubAuthCallback>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GithubAuthCallbackQueryResult = NonNullable<
+  Awaited<ReturnType<typeof githubAuthCallback>>
+>;
+export type GithubAuthCallbackQueryError = ErrorType<void>;
+
+/**
+ * @summary GitHub OAuth callback
+ */
+
+export function useGithubAuthCallback<
+  TData = Awaited<ReturnType<typeof githubAuthCallback>>,
+  TError = ErrorType<void>,
+>(
+  params?: GithubAuthCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof githubAuthCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGithubAuthCallbackQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

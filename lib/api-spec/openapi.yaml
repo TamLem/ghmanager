@@ -41,6 +41,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/GithubAuthStatus"
 
+  /github/auth/login:
+    get:
+      operationId: githubAuthLogin
+      tags: [github]
+      summary: Initiate GitHub OAuth login
+      description: >
+        Browser-redirect endpoint. Generates a CSRF state token, stores it in
+        the session cookie, and redirects the browser to the GitHub OAuth
+        authorization page. Not intended to be called via fetch/XHR.
+      responses:
+        "302":
+          description: Redirect to GitHub authorize page
+        "503":
+          description: OAuth not configured (missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET)
+
+  /github/auth/callback:
+    get:
+      operationId: githubAuthCallback
+      tags: [github]
+      summary: GitHub OAuth callback
+      description: >
+        Browser-redirect endpoint called by GitHub after the user authorizes the
+        app. Validates CSRF state, exchanges the authorization code for an access
+        token, stores the encrypted token in the session cookie, and redirects to
+        /dashboard. Not intended to be called via fetch/XHR.
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to /dashboard on success or /?error=... on failure
+
   /github/auth/disconnect:
     post:
       operationId: disconnectGithub

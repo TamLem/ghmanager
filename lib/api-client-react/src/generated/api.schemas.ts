@@ -136,6 +136,12 @@ export interface GithubActivityEvent {
   description: string;
 }
 
+export type GithubAuthCallbackParams = {
+  code?: string;
+  state?: string;
+  error?: string;
+};
+
 export type ListGithubReposParams = {
   sort?: ListGithubReposSort;
   direction?: ListGithubReposDirection;

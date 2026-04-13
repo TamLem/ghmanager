@@ -124,8 +124,9 @@ router.get(
   "/github/auth/login",
   (req: Request, res: Response): void => {
     const clientId = process.env.GITHUB_CLIENT_ID;
-    if (!clientId) {
-      res.status(503).send("GitHub OAuth is not configured. Set the GITHUB_CLIENT_ID environment variable.");
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      res.status(503).send("GitHub OAuth is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.");
       return;
     }
     const state = randomBytes(16).toString("hex");

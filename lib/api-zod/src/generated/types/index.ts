@@ -10,6 +10,7 @@ export * from "./apiError";
 export * from "./createGithubRepoBody";
 export * from "./getGithubActivityParams";
 export * from "./githubActivityEvent";
+export * from "./githubAuthCallbackParams";
 export * from "./githubAuthStatus";
 export * from "./githubLanguageStat";
 export * from "./githubProfile";

@@ -26,6 +26,17 @@ export const GetGithubAuthStatusResponse = zod.object({
 });
 
 /**
+ * Browser-redirect endpoint called by GitHub after the user authorizes the app. Validates CSRF state, exchanges the authorization code for an access token, stores the encrypted token in the session cookie, and redirects to /dashboard. Not intended to be called via fetch/XHR.
+
+ * @summary GitHub OAuth callback
+ */
+export const GithubAuthCallbackQueryParams = zod.object({
+  code: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  error: zod.coerce.string().optional(),
+});
+
+/**
  * Removes the GitHub session token
  * @summary Disconnect GitHub account
  */
