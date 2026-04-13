@@ -3,6 +3,15 @@ import type { Request, Response } from "express";
 import { randomBytes } from "crypto";
 import { getOctokitFromSession, createOctokit, requireGithubAuth } from "../../lib/github-client";
 import {
+  setGithubToken,
+  getGithubToken,
+  clearGithubToken,
+  destroySession,
+  setOauthState,
+  getAndClearOauthState,
+  getCallbackUrl,
+} from "../../lib/session";
+import {
   GetGithubProfileResponse,
   UpdateGithubProfileBody,
   ListGithubReposQueryParams,
@@ -29,7 +38,7 @@ type OctokitError = { status?: number; message?: string };
 function handleOctokitError(err: unknown, req: Request, res: Response): boolean {
   const e = err as OctokitError;
   if (e.status === 401 || e.status === 403) {
-    if (req.session) req.session.githubToken = null;
+    clearGithubToken(req);
     res.status(401).json({ error: "GitHub session expired or invalid. Please reconnect." });
     return true;
   }
@@ -95,7 +104,7 @@ function mapRepo(r: {
 router.get(
   "/github/auth/status",
   async (req: Request, res: Response): Promise<void> => {
-    const token = req.session?.githubToken as string | undefined | null;
+    const token = getGithubToken(req);
     if (!token) {
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
       return;
@@ -105,7 +114,7 @@ router.get(
       const { data } = await octokit.rest.users.getAuthenticated();
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: true, login: data.login, avatarUrl: data.avatar_url }));
     } catch {
-      if (req.session) req.session.githubToken = null;
+      clearGithubToken(req);
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
     }
   },
@@ -120,10 +129,12 @@ router.get(
       return;
     }
     const state = randomBytes(16).toString("hex");
-    if (req.session) req.session.oauthState = state;
+    setOauthState(req, state);
 
+    const callbackUrl = getCallbackUrl(req);
     const params = new URLSearchParams({
       client_id: clientId,
+      redirect_uri: callbackUrl,
       scope: "repo user delete_repo",
       state,
     });
@@ -149,8 +160,7 @@ router.get(
       return;
     }
 
-    const savedState = req.session?.oauthState as string | undefined | null;
-    if (req.session) req.session.oauthState = null;
+    const savedState = getAndClearOauthState(req);
 
     if (!state || !savedState || state !== savedState) {
       res.redirect("/?error=state_mismatch");
@@ -163,13 +173,19 @@ router.get(
     }
 
     try {
+      const callbackUrl = getCallbackUrl(req);
       const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+          redirect_uri: callbackUrl,
+        }),
       });
 
       const tokenData = await tokenRes.json() as { access_token?: string; error?: string; error_description?: string };
@@ -180,7 +196,7 @@ router.get(
         return;
       }
 
-      if (req.session) req.session.githubToken = tokenData.access_token;
+      setGithubToken(req, tokenData.access_token);
       res.redirect("/dashboard");
     } catch {
       res.redirect("/?error=auth_failed");
@@ -191,7 +207,7 @@ router.get(
 router.post(
   "/github/auth/disconnect",
   async (req: Request, res: Response): Promise<void> => {
-    req.session = null;
+    destroySession(req);
     res.json(DisconnectGithubResponse.parse({ success: true }));
   },
 );
