@@ -6,4 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./apiError";
+export * from "./createGithubRepoBody";
+export * from "./githubAuthStatus";
+export * from "./githubLanguageStat";
+export * from "./githubProfile";
+export * from "./githubRepo";
+export * from "./githubStats";
 export * from "./healthStatus";
+export * from "./listGithubReposDirection";
+export * from "./listGithubReposParams";
+export * from "./listGithubReposSort";
+export * from "./updateGithubProfileBody";
+export * from "./updateGithubRepoBody";

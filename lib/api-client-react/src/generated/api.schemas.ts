@@ -8,3 +8,141 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface ApiError {
+  error: string;
+}
+
+export interface GithubAuthStatus {
+  authenticated: boolean;
+  /** @nullable */
+  login: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+}
+
+export interface GithubProfile {
+  login: string;
+  id: number;
+  avatarUrl: string;
+  /** @nullable */
+  name: string | null;
+  /** @nullable */
+  company: string | null;
+  /** @nullable */
+  blog: string | null;
+  /** @nullable */
+  location: string | null;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  bio: string | null;
+  /** @nullable */
+  twitterUsername: string | null;
+  publicRepos: number;
+  followers: number;
+  following: number;
+  createdAt: string;
+  htmlUrl: string;
+}
+
+export interface UpdateGithubProfileBody {
+  name?: string;
+  email?: string;
+  blog?: string;
+  location?: string;
+  bio?: string;
+  twitterUsername?: string;
+  company?: string;
+}
+
+export interface GithubRepo {
+  id: number;
+  name: string;
+  fullName: string;
+  /** @nullable */
+  description: string | null;
+  private: boolean;
+  archived: boolean;
+  fork: boolean;
+  /** @nullable */
+  language: string | null;
+  stargazersCount: number;
+  forksCount: number;
+  watchersCount: number;
+  openIssuesCount: number;
+  hasIssues: boolean;
+  hasWiki: boolean;
+  hasProjects: boolean;
+  defaultBranch: string;
+  htmlUrl: string;
+  cloneUrl: string;
+  /** @nullable */
+  pushedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  topics: string[];
+  visibility: string;
+}
+
+export interface CreateGithubRepoBody {
+  name: string;
+  description?: string;
+  private?: boolean;
+  autoInit?: boolean;
+  gitignoreTemplate?: string;
+  licenseTemplate?: string;
+}
+
+export interface UpdateGithubRepoBody {
+  name?: string;
+  description?: string;
+  private?: boolean;
+  archived?: boolean;
+  hasIssues?: boolean;
+  hasWiki?: boolean;
+  hasProjects?: boolean;
+}
+
+export interface GithubLanguageStat {
+  language: string;
+  count: number;
+  percentage: number;
+}
+
+export interface GithubStats {
+  totalRepos: number;
+  totalStars: number;
+  totalForks: number;
+  totalWatchers: number;
+  publicRepos: number;
+  privateRepos: number;
+  archivedRepos: number;
+  languageBreakdown: GithubLanguageStat[];
+  mostStarredRepo?: GithubRepo;
+}
+
+export type ListGithubReposParams = {
+  sort?: ListGithubReposSort;
+  direction?: ListGithubReposDirection;
+  per_page?: number;
+  page?: number;
+};
+
+export type ListGithubReposSort =
+  (typeof ListGithubReposSort)[keyof typeof ListGithubReposSort];
+
+export const ListGithubReposSort = {
+  created: "created",
+  updated: "updated",
+  pushed: "pushed",
+  full_name: "full_name",
+} as const;
+
+export type ListGithubReposDirection =
+  (typeof ListGithubReposDirection)[keyof typeof ListGithubReposDirection];
+
+export const ListGithubReposDirection = {
+  asc: "asc",
+  desc: "desc",
+} as const;

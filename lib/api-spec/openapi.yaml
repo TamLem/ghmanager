@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: github
+    description: GitHub integration operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,197 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /github/auth/status:
+    get:
+      operationId: getGithubAuthStatus
+      tags: [github]
+      summary: Get GitHub auth status
+      description: Returns whether the user is authenticated with GitHub
+      responses:
+        "200":
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GithubAuthStatus"
+
+  /github/profile:
+    get:
+      operationId: getGithubProfile
+      tags: [github]
+      summary: Get GitHub profile
+      description: Returns the authenticated user's GitHub profile
+      responses:
+        "200":
+          description: GitHub profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GithubProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    patch:
+      operationId: updateGithubProfile
+      tags: [github]
+      summary: Update GitHub profile
+      description: Updates the authenticated user's GitHub profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGithubProfileBody"
+      responses:
+        "200":
+          description: Updated GitHub profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GithubProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /github/repos:
+    get:
+      operationId: listGithubRepos
+      tags: [github]
+      summary: List GitHub repositories
+      description: Returns the authenticated user's GitHub repositories
+      parameters:
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [created, updated, pushed, full_name]
+        - name: direction
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: number
+      responses:
+        "200":
+          description: List of repositories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GithubRepo"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    post:
+      operationId: createGithubRepo
+      tags: [github]
+      summary: Create a GitHub repository
+      description: Creates a new repository for the authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGithubRepoBody"
+      responses:
+        "201":
+          description: Created repository
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GithubRepo"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /github/repos/{owner}/{repo}:
+    patch:
+      operationId: updateGithubRepo
+      tags: [github]
+      summary: Update a GitHub repository
+      description: Updates repository settings (visibility, archive state, features)
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGithubRepoBody"
+      responses:
+        "200":
+          description: Updated repository
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GithubRepo"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /github/stats:
+    get:
+      operationId: getGithubStats
+      tags: [github]
+      summary: Get GitHub stats summary
+      description: Returns aggregated stats across all user repositories (stars, forks, language breakdown)
+      responses:
+        "200":
+          description: GitHub stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GithubStats"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +227,251 @@ components:
       required:
         - status
 
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    GithubAuthStatus:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+        login:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+      required:
+        - authenticated
+        - login
+        - avatarUrl
+
+    GithubProfile:
+      type: object
+      properties:
+        login:
+          type: string
+        id:
+          type: number
+        avatarUrl:
+          type: string
+        name:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        blog:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        bio:
+          type: ["string", "null"]
+        twitterUsername:
+          type: ["string", "null"]
+        publicRepos:
+          type: number
+        followers:
+          type: number
+        following:
+          type: number
+        createdAt:
+          type: string
+        htmlUrl:
+          type: string
+      required:
+        - login
+        - id
+        - avatarUrl
+        - name
+        - company
+        - blog
+        - location
+        - email
+        - bio
+        - twitterUsername
+        - publicRepos
+        - followers
+        - following
+        - createdAt
+        - htmlUrl
+
+    UpdateGithubProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        blog:
+          type: string
+        location:
+          type: string
+        bio:
+          type: string
+        twitterUsername:
+          type: string
+        company:
+          type: string
+
+    GithubRepo:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        fullName:
+          type: string
+        description:
+          type: ["string", "null"]
+        private:
+          type: boolean
+        archived:
+          type: boolean
+        fork:
+          type: boolean
+        language:
+          type: ["string", "null"]
+        stargazersCount:
+          type: number
+        forksCount:
+          type: number
+        watchersCount:
+          type: number
+        openIssuesCount:
+          type: number
+        hasIssues:
+          type: boolean
+        hasWiki:
+          type: boolean
+        hasProjects:
+          type: boolean
+        defaultBranch:
+          type: string
+        htmlUrl:
+          type: string
+        cloneUrl:
+          type: string
+        pushedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        topics:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+      required:
+        - id
+        - name
+        - fullName
+        - description
+        - private
+        - archived
+        - fork
+        - language
+        - stargazersCount
+        - forksCount
+        - watchersCount
+        - openIssuesCount
+        - hasIssues
+        - hasWiki
+        - hasProjects
+        - defaultBranch
+        - htmlUrl
+        - cloneUrl
+        - pushedAt
+        - createdAt
+        - updatedAt
+        - topics
+        - visibility
+
+    CreateGithubRepoBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        private:
+          type: boolean
+        autoInit:
+          type: boolean
+        gitignoreTemplate:
+          type: string
+        licenseTemplate:
+          type: string
+      required:
+        - name
+
+    UpdateGithubRepoBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        private:
+          type: boolean
+        archived:
+          type: boolean
+        hasIssues:
+          type: boolean
+        hasWiki:
+          type: boolean
+        hasProjects:
+          type: boolean
+
+    GithubLanguageStat:
+      type: object
+      properties:
+        language:
+          type: string
+        count:
+          type: number
+        percentage:
+          type: number
+      required:
+        - language
+        - count
+        - percentage
+
+    GithubStats:
+      type: object
+      properties:
+        totalRepos:
+          type: number
+        totalStars:
+          type: number
+        totalForks:
+          type: number
+        totalWatchers:
+          type: number
+        publicRepos:
+          type: number
+        privateRepos:
+          type: number
+        archivedRepos:
+          type: number
+        languageBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/GithubLanguageStat"
+        mostStarredRepo:
+          $ref: "#/components/schemas/GithubRepo"
+      required:
+        - totalRepos
+        - totalStars
+        - totalForks
+        - totalWatchers
+        - publicRepos
+        - privateRepos
+        - archivedRepos
+        - languageBreakdown

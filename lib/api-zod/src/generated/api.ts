@@ -14,3 +14,211 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns whether the user is authenticated with GitHub
+ * @summary Get GitHub auth status
+ */
+export const GetGithubAuthStatusResponse = zod.object({
+  authenticated: zod.boolean(),
+  login: zod.string().nullable(),
+  avatarUrl: zod.string().nullable(),
+});
+
+/**
+ * Returns the authenticated user's GitHub profile
+ * @summary Get GitHub profile
+ */
+export const GetGithubProfileResponse = zod.object({
+  login: zod.string(),
+  id: zod.number(),
+  avatarUrl: zod.string(),
+  name: zod.string().nullable(),
+  company: zod.string().nullable(),
+  blog: zod.string().nullable(),
+  location: zod.string().nullable(),
+  email: zod.string().nullable(),
+  bio: zod.string().nullable(),
+  twitterUsername: zod.string().nullable(),
+  publicRepos: zod.number(),
+  followers: zod.number(),
+  following: zod.number(),
+  createdAt: zod.string(),
+  htmlUrl: zod.string(),
+});
+
+/**
+ * Updates the authenticated user's GitHub profile
+ * @summary Update GitHub profile
+ */
+export const UpdateGithubProfileBody = zod.object({
+  name: zod.string().optional(),
+  email: zod.string().optional(),
+  blog: zod.string().optional(),
+  location: zod.string().optional(),
+  bio: zod.string().optional(),
+  twitterUsername: zod.string().optional(),
+  company: zod.string().optional(),
+});
+
+export const UpdateGithubProfileResponse = zod.object({
+  login: zod.string(),
+  id: zod.number(),
+  avatarUrl: zod.string(),
+  name: zod.string().nullable(),
+  company: zod.string().nullable(),
+  blog: zod.string().nullable(),
+  location: zod.string().nullable(),
+  email: zod.string().nullable(),
+  bio: zod.string().nullable(),
+  twitterUsername: zod.string().nullable(),
+  publicRepos: zod.number(),
+  followers: zod.number(),
+  following: zod.number(),
+  createdAt: zod.string(),
+  htmlUrl: zod.string(),
+});
+
+/**
+ * Returns the authenticated user's GitHub repositories
+ * @summary List GitHub repositories
+ */
+export const ListGithubReposQueryParams = zod.object({
+  sort: zod.enum(["created", "updated", "pushed", "full_name"]).optional(),
+  direction: zod.enum(["asc", "desc"]).optional(),
+  per_page: zod.coerce.number().optional(),
+  page: zod.coerce.number().optional(),
+});
+
+export const ListGithubReposResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  fullName: zod.string(),
+  description: zod.string().nullable(),
+  private: zod.boolean(),
+  archived: zod.boolean(),
+  fork: zod.boolean(),
+  language: zod.string().nullable(),
+  stargazersCount: zod.number(),
+  forksCount: zod.number(),
+  watchersCount: zod.number(),
+  openIssuesCount: zod.number(),
+  hasIssues: zod.boolean(),
+  hasWiki: zod.boolean(),
+  hasProjects: zod.boolean(),
+  defaultBranch: zod.string(),
+  htmlUrl: zod.string(),
+  cloneUrl: zod.string(),
+  pushedAt: zod.string().nullable(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  topics: zod.array(zod.string()),
+  visibility: zod.string(),
+});
+export const ListGithubReposResponse = zod.array(ListGithubReposResponseItem);
+
+/**
+ * Creates a new repository for the authenticated user
+ * @summary Create a GitHub repository
+ */
+export const CreateGithubRepoBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  private: zod.boolean().optional(),
+  autoInit: zod.boolean().optional(),
+  gitignoreTemplate: zod.string().optional(),
+  licenseTemplate: zod.string().optional(),
+});
+
+/**
+ * Updates repository settings (visibility, archive state, features)
+ * @summary Update a GitHub repository
+ */
+export const UpdateGithubRepoParams = zod.object({
+  owner: zod.coerce.string(),
+  repo: zod.coerce.string(),
+});
+
+export const UpdateGithubRepoBody = zod.object({
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  private: zod.boolean().optional(),
+  archived: zod.boolean().optional(),
+  hasIssues: zod.boolean().optional(),
+  hasWiki: zod.boolean().optional(),
+  hasProjects: zod.boolean().optional(),
+});
+
+export const UpdateGithubRepoResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  fullName: zod.string(),
+  description: zod.string().nullable(),
+  private: zod.boolean(),
+  archived: zod.boolean(),
+  fork: zod.boolean(),
+  language: zod.string().nullable(),
+  stargazersCount: zod.number(),
+  forksCount: zod.number(),
+  watchersCount: zod.number(),
+  openIssuesCount: zod.number(),
+  hasIssues: zod.boolean(),
+  hasWiki: zod.boolean(),
+  hasProjects: zod.boolean(),
+  defaultBranch: zod.string(),
+  htmlUrl: zod.string(),
+  cloneUrl: zod.string(),
+  pushedAt: zod.string().nullable(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  topics: zod.array(zod.string()),
+  visibility: zod.string(),
+});
+
+/**
+ * Returns aggregated stats across all user repositories (stars, forks, language breakdown)
+ * @summary Get GitHub stats summary
+ */
+export const GetGithubStatsResponse = zod.object({
+  totalRepos: zod.number(),
+  totalStars: zod.number(),
+  totalForks: zod.number(),
+  totalWatchers: zod.number(),
+  publicRepos: zod.number(),
+  privateRepos: zod.number(),
+  archivedRepos: zod.number(),
+  languageBreakdown: zod.array(
+    zod.object({
+      language: zod.string(),
+      count: zod.number(),
+      percentage: zod.number(),
+    }),
+  ),
+  mostStarredRepo: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      fullName: zod.string(),
+      description: zod.string().nullable(),
+      private: zod.boolean(),
+      archived: zod.boolean(),
+      fork: zod.boolean(),
+      language: zod.string().nullable(),
+      stargazersCount: zod.number(),
+      forksCount: zod.number(),
+      watchersCount: zod.number(),
+      openIssuesCount: zod.number(),
+      hasIssues: zod.boolean(),
+      hasWiki: zod.boolean(),
+      hasProjects: zod.boolean(),
+      defaultBranch: zod.string(),
+      htmlUrl: zod.string(),
+      cloneUrl: zod.string(),
+      pushedAt: zod.string().nullable(),
+      createdAt: zod.string(),
+      updatedAt: zod.string(),
+      topics: zod.array(zod.string()),
+      visibility: zod.string(),
+    })
+    .optional(),
+});
