@@ -153,6 +153,41 @@ export const CreateGithubRepoBody = zod.object({
 });
 
 /**
+ * Returns a single repository by owner and name
+ * @summary Get a GitHub repository
+ */
+export const GetGithubRepoParams = zod.object({
+  owner: zod.coerce.string(),
+  repo: zod.coerce.string(),
+});
+
+export const GetGithubRepoResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  fullName: zod.string(),
+  description: zod.string().nullable(),
+  private: zod.boolean(),
+  archived: zod.boolean(),
+  fork: zod.boolean(),
+  language: zod.string().nullable(),
+  stargazersCount: zod.number(),
+  forksCount: zod.number(),
+  watchersCount: zod.number(),
+  openIssuesCount: zod.number(),
+  hasIssues: zod.boolean(),
+  hasWiki: zod.boolean(),
+  hasProjects: zod.boolean(),
+  defaultBranch: zod.string(),
+  htmlUrl: zod.string(),
+  cloneUrl: zod.string(),
+  pushedAt: zod.string().nullable(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  topics: zod.array(zod.string()),
+  visibility: zod.string(),
+});
+
+/**
  * Permanently deletes a repository. Cannot be undone.
  * @summary Delete a GitHub repository
  */

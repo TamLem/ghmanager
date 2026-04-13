@@ -709,6 +709,98 @@ export const useCreateGithubRepo = <
 };
 
 /**
+ * Returns a single repository by owner and name
+ * @summary Get a GitHub repository
+ */
+export const getGetGithubRepoUrl = (owner: string, repo: string) => {
+  return `/api/github/repos/${owner}/${repo}`;
+};
+
+export const getGithubRepo = async (
+  owner: string,
+  repo: string,
+  options?: RequestInit,
+): Promise<GithubRepo> => {
+  return customFetch<GithubRepo>(getGetGithubRepoUrl(owner, repo), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetGithubRepoQueryKey = (owner: string, repo: string) => {
+  return [`/api/github/repos/${owner}/${repo}`] as const;
+};
+
+export const getGetGithubRepoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getGithubRepo>>,
+  TError = ErrorType<ApiError>,
+>(
+  owner: string,
+  repo: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGithubRepo>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetGithubRepoQueryKey(owner, repo);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getGithubRepo>>> = ({
+    signal,
+  }) => getGithubRepo(owner, repo, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(owner && repo),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getGithubRepo>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetGithubRepoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getGithubRepo>>
+>;
+export type GetGithubRepoQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get a GitHub repository
+ */
+
+export function useGetGithubRepo<
+  TData = Awaited<ReturnType<typeof getGithubRepo>>,
+  TError = ErrorType<ApiError>,
+>(
+  owner: string,
+  repo: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGithubRepo>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetGithubRepoQueryOptions(owner, repo, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * Permanently deletes a repository. Cannot be undone.
  * @summary Delete a GitHub repository
  */

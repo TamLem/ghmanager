@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Repositories from "@/pages/repos";
+import RepoDetail from "@/pages/repo-detail";
 
 const queryClient = new QueryClient();
 
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/repos" component={Repositories} />
+      <Route path="/repos/:owner/:name" component={RepoDetail} />
       <Route component={NotFound} />
     </Switch>
   );

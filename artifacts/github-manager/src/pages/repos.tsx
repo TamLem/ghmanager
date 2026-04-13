@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { 
   useGetGithubAuthStatus, 
   useListGithubRepos,
@@ -213,9 +213,9 @@ export default function Repositories() {
                   <Card key={repo.id} className="flex flex-col sm:flex-row gap-4 p-5 hover:border-primary/50 transition-colors border-border bg-card">
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <a href={repo.htmlUrl} target="_blank" rel="noreferrer" className="text-lg font-semibold text-primary hover:underline truncate">
+                        <Link href={`/repos/${owner}/${repo.name}`} className="text-lg font-semibold text-primary hover:underline truncate">
                           {repo.name}
-                        </a>
+                        </Link>
                         <Badge variant="outline" className={`shrink-0 ${repo.private ? 'text-amber-500 border-amber-500/30' : 'text-emerald-500 border-emerald-500/30'}`}>
                           {repo.private ? <Lock className="w-3 h-3 mr-1" /> : <Globe className="w-3 h-3 mr-1" />}
                           {repo.private ? "Private" : "Public"}

@@ -72,7 +72,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton 
               asChild 
-              isActive={location === "/repos"}
+              isActive={location === "/repos" || location.startsWith("/repos/")}
               tooltip="Repositories"
             >
               <Link href="/repos">

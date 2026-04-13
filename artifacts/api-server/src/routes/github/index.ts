@@ -19,6 +19,8 @@ import {
   GetGithubActivityResponse,
   ConnectGithubResponse,
   DisconnectGithubResponse,
+  GetGithubRepoParams,
+  GetGithubRepoResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -258,6 +260,31 @@ router.post(
         license_template: parsed.data.licenseTemplate,
       });
       res.status(201).json(ListGithubReposResponseItem.parse(mapRepo(data as Parameters<typeof mapRepo>[0])));
+    } catch (err) {
+      if (handleOctokitError(err, req, res)) return;
+      throw err;
+    }
+  },
+);
+
+router.get(
+  "/github/repos/:owner/:repo",
+  requireGithubAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const octokit = getOctokitFromSession(req)!;
+    const rawOwner = Array.isArray(req.params.owner) ? req.params.owner[0] : req.params.owner;
+    const rawRepo = Array.isArray(req.params.repo) ? req.params.repo[0] : req.params.repo;
+    const paramsParsed = GetGithubRepoParams.safeParse({ owner: rawOwner, repo: rawRepo });
+    if (!paramsParsed.success) {
+      res.status(400).json({ error: paramsParsed.error.message });
+      return;
+    }
+    try {
+      const { data } = await octokit.rest.repos.get({
+        owner: paramsParsed.data.owner,
+        repo: paramsParsed.data.repo,
+      });
+      res.json(GetGithubRepoResponse.parse(mapRepo(data as Parameters<typeof mapRepo>[0])));
     } catch (err) {
       if (handleOctokitError(err, req, res)) return;
       throw err;

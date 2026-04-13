@@ -195,6 +195,41 @@ paths:
                 $ref: "#/components/schemas/ApiError"
 
   /github/repos/{owner}/{repo}:
+    get:
+      operationId: getGithubRepo
+      tags: [github]
+      summary: Get a GitHub repository
+      description: Returns a single repository by owner and name
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Repository details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GithubRepo"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
     delete:
       operationId: deleteGithubRepo
       tags: [github]
