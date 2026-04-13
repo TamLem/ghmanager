@@ -41,32 +41,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/GithubAuthStatus"
 
-  /github/auth/connect:
-    post:
-      operationId: connectGithub
-      tags: [github]
-      summary: Connect GitHub account
-      description: Connect with a GitHub Personal Access Token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ConnectGithubBody"
-      responses:
-        "200":
-          description: Connection successful
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/GithubAuthStatus"
-        "401":
-          description: Invalid token
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiError"
-
   /github/auth/disconnect:
     post:
       operationId: disconnectGithub
@@ -380,14 +354,6 @@ components:
           type: boolean
       required:
         - success
-
-    ConnectGithubBody:
-      type: object
-      properties:
-        token:
-          type: string
-      required:
-        - token
 
     GithubAuthStatus:
       type: object

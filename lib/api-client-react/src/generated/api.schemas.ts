@@ -17,10 +17,6 @@ export interface SuccessResponse {
   success: boolean;
 }
 
-export interface ConnectGithubBody {
-  token: string;
-}
-
 export interface GithubAuthStatus {
   authenticated: boolean;
   /** @nullable */

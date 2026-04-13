@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import type { Request, Response } from "express";
+import { randomBytes } from "crypto";
 import { getOctokitFromSession, createOctokit, requireGithubAuth } from "../../lib/github-client";
 import {
   GetGithubProfileResponse,
@@ -14,10 +15,8 @@ import {
   ListGithubReposResponseItem,
   UpdateGithubProfileResponse,
   UpdateGithubRepoResponse,
-  ConnectGithubBody,
   GetGithubActivityQueryParams,
   GetGithubActivityResponse,
-  ConnectGithubResponse,
   DisconnectGithubResponse,
   GetGithubRepoParams,
   GetGithubRepoResponse,
@@ -30,7 +29,7 @@ type OctokitError = { status?: number; message?: string };
 function handleOctokitError(err: unknown, req: Request, res: Response): boolean {
   const e = err as OctokitError;
   if (e.status === 401 || e.status === 403) {
-    if (req.session) req.session.githubToken = undefined;
+    if (req.session) req.session.githubToken = null;
     res.status(401).json({ error: "GitHub session expired or invalid. Please reconnect." });
     return true;
   }
@@ -96,7 +95,7 @@ function mapRepo(r: {
 router.get(
   "/github/auth/status",
   async (req: Request, res: Response): Promise<void> => {
-    const token = req.session?.githubToken;
+    const token = req.session?.githubToken as string | undefined | null;
     if (!token) {
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
       return;
@@ -106,27 +105,85 @@ router.get(
       const { data } = await octokit.rest.users.getAuthenticated();
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: true, login: data.login, avatarUrl: data.avatar_url }));
     } catch {
-      if (req.session) req.session.githubToken = undefined;
+      if (req.session) req.session.githubToken = null;
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
     }
   },
 );
 
-router.post(
-  "/github/auth/connect",
-  async (req: Request, res: Response): Promise<void> => {
-    const parsed = ConnectGithubBody.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "token is required" });
+router.get(
+  "/github/auth/login",
+  (req: Request, res: Response): void => {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    if (!clientId) {
+      res.status(503).send("GitHub OAuth is not configured. Set the GITHUB_CLIENT_ID environment variable.");
       return;
     }
+    const state = randomBytes(16).toString("hex");
+    if (req.session) req.session.oauthState = state;
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      scope: "repo user delete_repo",
+      state,
+    });
+    res.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
+  },
+);
+
+router.get(
+  "/github/auth/callback",
+  async (req: Request, res: Response): Promise<void> => {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      res.redirect("/?error=oauth_not_configured");
+      return;
+    }
+
+    const { code, state, error } = req.query;
+
+    if (error) {
+      res.redirect(`/?error=${encodeURIComponent(String(error))}`);
+      return;
+    }
+
+    const savedState = req.session?.oauthState as string | undefined | null;
+    if (req.session) req.session.oauthState = null;
+
+    if (!state || !savedState || state !== savedState) {
+      res.redirect("/?error=state_mismatch");
+      return;
+    }
+
+    if (!code || typeof code !== "string") {
+      res.redirect("/?error=no_code");
+      return;
+    }
+
     try {
-      const octokit = createOctokit(parsed.data.token);
-      const { data } = await octokit.rest.users.getAuthenticated();
-      req.session.githubToken = parsed.data.token;
-      res.json(ConnectGithubResponse.parse({ authenticated: true, login: data.login, avatarUrl: data.avatar_url }));
+      const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+      });
+
+      const tokenData = await tokenRes.json() as { access_token?: string; error?: string; error_description?: string };
+
+      if (!tokenData.access_token) {
+        const msg = tokenData.error_description ?? tokenData.error ?? "token_exchange_failed";
+        res.redirect(`/?error=${encodeURIComponent(msg)}`);
+        return;
+      }
+
+      if (req.session) req.session.githubToken = tokenData.access_token;
+      res.redirect("/dashboard");
     } catch {
-      res.status(401).json({ error: "Invalid GitHub token" });
+      res.redirect("/?error=auth_failed");
     }
   },
 );
@@ -134,7 +191,7 @@ router.post(
 router.post(
   "/github/auth/disconnect",
   async (req: Request, res: Response): Promise<void> => {
-    if (req.session) req.session.githubToken = undefined;
+    req.session = null;
     res.json(DisconnectGithubResponse.parse({ success: true }));
   },
 );

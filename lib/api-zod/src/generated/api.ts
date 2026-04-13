@@ -26,20 +26,6 @@ export const GetGithubAuthStatusResponse = zod.object({
 });
 
 /**
- * Connect with a GitHub Personal Access Token
- * @summary Connect GitHub account
- */
-export const ConnectGithubBody = zod.object({
-  token: zod.string(),
-});
-
-export const ConnectGithubResponse = zod.object({
-  authenticated: zod.boolean(),
-  login: zod.string().nullable(),
-  avatarUrl: zod.string().nullable(),
-});
-
-/**
  * Removes the GitHub session token
  * @summary Disconnect GitHub account
  */

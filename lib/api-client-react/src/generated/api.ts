@@ -18,7 +18,6 @@ import type {
 
 import type {
   ApiError,
-  ConnectGithubBody,
   CreateGithubRepoBody,
   GetGithubActivityParams,
   GithubActivityEvent,
@@ -193,93 +192,6 @@ export function useGetGithubAuthStatus<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
-/**
- * Connect with a GitHub Personal Access Token
- * @summary Connect GitHub account
- */
-export const getConnectGithubUrl = () => {
-  return `/api/github/auth/connect`;
-};
-
-export const connectGithub = async (
-  connectGithubBody: ConnectGithubBody,
-  options?: RequestInit,
-): Promise<GithubAuthStatus> => {
-  return customFetch<GithubAuthStatus>(getConnectGithubUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(connectGithubBody),
-  });
-};
-
-export const getConnectGithubMutationOptions = <
-  TError = ErrorType<ApiError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof connectGithub>>,
-    TError,
-    { data: BodyType<ConnectGithubBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof connectGithub>>,
-  TError,
-  { data: BodyType<ConnectGithubBody> },
-  TContext
-> => {
-  const mutationKey = ["connectGithub"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof connectGithub>>,
-    { data: BodyType<ConnectGithubBody> }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return connectGithub(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ConnectGithubMutationResult = NonNullable<
-  Awaited<ReturnType<typeof connectGithub>>
->;
-export type ConnectGithubMutationBody = BodyType<ConnectGithubBody>;
-export type ConnectGithubMutationError = ErrorType<ApiError>;
-
-/**
- * @summary Connect GitHub account
- */
-export const useConnectGithub = <
-  TError = ErrorType<ApiError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof connectGithub>>,
-    TError,
-    { data: BodyType<ConnectGithubBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof connectGithub>>,
-  TError,
-  { data: BodyType<ConnectGithubBody> },
-  TContext
-> => {
-  return useMutation(getConnectGithubMutationOptions(options));
-};
 
 /**
  * Removes the GitHub session token

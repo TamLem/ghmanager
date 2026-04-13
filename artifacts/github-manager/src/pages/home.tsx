@@ -1,26 +1,36 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { 
+import { useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
+import {
   useGetGithubAuthStatus,
-  useConnectGithub,
   getGetGithubAuthStatusQueryKey
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Github, Terminal } from "lucide-react";
+import { Github, Terminal, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+const ERROR_MESSAGES: Record<string, string> = {
+  oauth_not_configured: "GitHub OAuth is not yet configured on this server.",
+  state_mismatch: "Security check failed. Please try again.",
+  no_code: "GitHub did not return an authorization code. Please try again.",
+  access_denied: "Access was denied. Please authorize the app to continue.",
+  auth_failed: "Authentication failed. Please try again.",
+  token_exchange_failed: "Could not exchange the authorization code for a token.",
+};
+
 export default function Home() {
-  const [token, setToken] = useState("");
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  const { data: authStatus, isLoading: isLoadingAuth } = useGetGithubAuthStatus({ query: { queryKey: getGetGithubAuthStatusQueryKey() } });
-  const connectGithub = useConnectGithub();
+
+  const { data: authStatus, isLoading: isLoadingAuth } = useGetGithubAuthStatus({
+    query: { queryKey: getGetGithubAuthStatusQueryKey() },
+  });
+
+  const errorParam = new URLSearchParams(search).get("error");
+  const errorMessage = errorParam
+    ? (ERROR_MESSAGES[errorParam] ?? decodeURIComponent(errorParam))
+    : null;
 
   useEffect(() => {
     if (authStatus?.authenticated) {
@@ -28,28 +38,28 @@ export default function Home() {
     }
   }, [authStatus, setLocation]);
 
-  const handleConnect = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-    
-    connectGithub.mutate({ data: { token } }, {
-      onSuccess: (data) => {
-        queryClient.setQueryData(getGetGithubAuthStatusQueryKey(), data);
-        toast({ title: "Connected", description: "Successfully authenticated with GitHub." });
-        setLocation("/dashboard");
-      },
-      onError: () => {
-        toast({ title: "Connection failed", description: "Invalid token or insufficient permissions.", variant: "destructive" });
-      }
-    });
+  useEffect(() => {
+    if (errorMessage) {
+      toast({ title: "Connection failed", description: errorMessage, variant: "destructive" });
+    }
+  }, [errorMessage, toast]);
+
+  const handleConnect = () => {
+    window.location.href = "/api/github/auth/login";
   };
 
-  if (isLoadingAuth) return <div className="min-h-screen flex items-center justify-center bg-background"><Terminal className="h-8 w-8 animate-pulse text-muted-foreground" /></div>;
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Terminal className="h-8 w-8 animate-pulse text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background dark p-4 text-foreground selection:bg-primary/30">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-background to-background pointer-events-none" />
-      
+
       <div className="w-full max-w-md relative z-10 space-y-8">
         <div className="text-center space-y-4">
           <div className="inline-flex items-center justify-center p-4 bg-card rounded-2xl border border-border shadow-xl">
@@ -62,38 +72,24 @@ export default function Home() {
         <Card className="border-border/50 shadow-2xl bg-card/50 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-xl">Connect Account</CardTitle>
-            <CardDescription>Enter a Personal Access Token to continue.</CardDescription>
+            <CardDescription>Sign in with GitHub to manage your repositories and profile.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleConnect} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="token" className="text-muted-foreground">Personal Access Token (Classic)</Label>
-                <Input 
-                  id="token" 
-                  type="password" 
-                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" 
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  className="font-mono bg-background/50"
-                  required
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Needs <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">repo</code>, <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">user</code>, and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">delete_repo</code> scopes.{" "}
-                  <a 
-                    href="https://github.com/settings/tokens/new?scopes=repo,user,delete_repo" 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="text-primary hover:underline underline-offset-4"
-                  >
-                    Generate one here
-                  </a>.
-                </p>
+          <CardContent className="space-y-4">
+            {errorMessage && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{errorMessage}</span>
               </div>
-              <Button type="submit" className="w-full font-medium" disabled={connectGithub.isPending || !token}>
-                {connectGithub.isPending ? "Connecting..." : "Connect GitHub"}
-              </Button>
-            </form>
+            )}
+            <Button className="w-full font-medium gap-2" onClick={handleConnect}>
+              <Github className="h-4 w-4" />
+              Connect with GitHub
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              Requests <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">repo</code>,{" "}
+              <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">user</code>, and{" "}
+              <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">delete_repo</code> scopes.
+            </p>
           </CardContent>
         </Card>
       </div>

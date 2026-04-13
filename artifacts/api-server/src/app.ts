@@ -1,7 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
-import session from "express-session";
+import cookieSession from "cookie-session";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -46,16 +46,13 @@ if (!sessionSecret) {
 }
 
 app.use(
-  session({
-    secret: sessionSecret ?? "dev-secret-change-in-prod",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    },
+  cookieSession({
+    name: "session",
+    keys: [sessionSecret ?? "dev-secret-change-in-prod"],
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
   }),
 );
 

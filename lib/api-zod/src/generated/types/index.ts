@@ -7,7 +7,6 @@
  */
 
 export * from "./apiError";
-export * from "./connectGithubBody";
 export * from "./createGithubRepoBody";
 export * from "./getGithubActivityParams";
 export * from "./githubActivityEvent";
