@@ -37,12 +37,17 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const sessionSecret =
-  process.env.SESSION_SECRET ?? "dev-secret-change-in-prod";
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET environment variable is required in production");
+  }
+  logger.warn("SESSION_SECRET not set — using insecure fallback. Set SESSION_SECRET for production.");
+}
 
 app.use(
   session({
-    secret: sessionSecret,
+    secret: sessionSecret ?? "dev-secret-change-in-prod",
     resave: false,
     saveUninitialized: false,
     cookie: {

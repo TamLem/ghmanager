@@ -25,12 +25,15 @@ GitHub Profile & Repository Manager — a full-stack web app that lets users con
 
 ## Authentication Flow
 
-Users connect via a GitHub Personal Access Token (PAT) which is stored in an express-session.
+Users connect their GitHub account directly within the app using a Personal Access Token (PAT). The Replit GitHub OAuth connector was intentionally not used — auth is set up from within the app itself, not through an external flow. The PAT is validated with GitHub's API and stored securely in a server-side session (httpOnly cookie).
+
 - POST `/api/github/auth/connect` — accepts `{ token }`, validates with GitHub API, stores in session
-- POST `/api/github/auth/disconnect` — clears session token
+- POST `/api/github/auth/disconnect` — clears session token  
 - GET `/api/github/auth/status` — returns `{ authenticated, login, avatarUrl }`
 
 Required PAT scopes: `repo`, `user`
+
+> Note: The Replit GitHub connector (connector:ccfg_github_01K4B9XD3VRVD2F99YM91YTCAF) was dismissed by the user — in-app PAT setup is the intended design.
 
 ## API Endpoints
 
