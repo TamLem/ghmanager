@@ -18,13 +18,17 @@ import type {
 
 import type {
   ApiError,
+  ConnectGithubBody,
   CreateGithubRepoBody,
+  GetGithubActivityParams,
+  GithubActivityEvent,
   GithubAuthStatus,
   GithubProfile,
   GithubRepo,
   GithubStats,
   HealthStatus,
   ListGithubReposParams,
+  SuccessResponse,
   UpdateGithubProfileBody,
   UpdateGithubRepoBody,
 } from "./api.schemas";
@@ -189,6 +193,175 @@ export function useGetGithubAuthStatus<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Connect with a GitHub Personal Access Token
+ * @summary Connect GitHub account
+ */
+export const getConnectGithubUrl = () => {
+  return `/api/github/auth/connect`;
+};
+
+export const connectGithub = async (
+  connectGithubBody: ConnectGithubBody,
+  options?: RequestInit,
+): Promise<GithubAuthStatus> => {
+  return customFetch<GithubAuthStatus>(getConnectGithubUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(connectGithubBody),
+  });
+};
+
+export const getConnectGithubMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof connectGithub>>,
+    TError,
+    { data: BodyType<ConnectGithubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof connectGithub>>,
+  TError,
+  { data: BodyType<ConnectGithubBody> },
+  TContext
+> => {
+  const mutationKey = ["connectGithub"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof connectGithub>>,
+    { data: BodyType<ConnectGithubBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return connectGithub(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConnectGithubMutationResult = NonNullable<
+  Awaited<ReturnType<typeof connectGithub>>
+>;
+export type ConnectGithubMutationBody = BodyType<ConnectGithubBody>;
+export type ConnectGithubMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Connect GitHub account
+ */
+export const useConnectGithub = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof connectGithub>>,
+    TError,
+    { data: BodyType<ConnectGithubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof connectGithub>>,
+  TError,
+  { data: BodyType<ConnectGithubBody> },
+  TContext
+> => {
+  return useMutation(getConnectGithubMutationOptions(options));
+};
+
+/**
+ * Removes the GitHub session token
+ * @summary Disconnect GitHub account
+ */
+export const getDisconnectGithubUrl = () => {
+  return `/api/github/auth/disconnect`;
+};
+
+export const disconnectGithub = async (
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getDisconnectGithubUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getDisconnectGithubMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectGithub>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof disconnectGithub>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["disconnectGithub"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof disconnectGithub>>,
+    void
+  > = () => {
+    return disconnectGithub(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DisconnectGithubMutationResult = NonNullable<
+  Awaited<ReturnType<typeof disconnectGithub>>
+>;
+
+export type DisconnectGithubMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Disconnect GitHub account
+ */
+export const useDisconnectGithub = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectGithub>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof disconnectGithub>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getDisconnectGithubMutationOptions(options));
+};
 
 /**
  * Returns the authenticated user's GitHub profile
@@ -692,6 +865,104 @@ export function useGetGithubStats<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetGithubStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns recent public GitHub events for the authenticated user
+ * @summary Get recent activity feed
+ */
+export const getGetGithubActivityUrl = (params?: GetGithubActivityParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/github/activity?${stringifiedParams}`
+    : `/api/github/activity`;
+};
+
+export const getGithubActivity = async (
+  params?: GetGithubActivityParams,
+  options?: RequestInit,
+): Promise<GithubActivityEvent[]> => {
+  return customFetch<GithubActivityEvent[]>(getGetGithubActivityUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetGithubActivityQueryKey = (
+  params?: GetGithubActivityParams,
+) => {
+  return [`/api/github/activity`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetGithubActivityQueryOptions = <
+  TData = Awaited<ReturnType<typeof getGithubActivity>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: GetGithubActivityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGithubActivity>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetGithubActivityQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getGithubActivity>>
+  > = ({ signal }) => getGithubActivity(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getGithubActivity>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetGithubActivityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getGithubActivity>>
+>;
+export type GetGithubActivityQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get recent activity feed
+ */
+
+export function useGetGithubActivity<
+  TData = Awaited<ReturnType<typeof getGithubActivity>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: GetGithubActivityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGithubActivity>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetGithubActivityQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

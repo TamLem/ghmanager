@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useGetGithubAuthStatus } from "@workspace/api-client-react";
+import { 
+  useGetGithubAuthStatus,
+  useConnectGithub,
+  getGetGithubAuthStatusQueryKey
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +15,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function Home() {
   const [token, setToken] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  const { data: authStatus, isLoading: isLoadingAuth } = useGetGithubAuthStatus();
+  const { data: authStatus, isLoading: isLoadingAuth } = useGetGithubAuthStatus({ query: { queryKey: getGetGithubAuthStatusQueryKey() } });
+  const connectGithub = useConnectGithub();
 
   useEffect(() => {
     if (authStatus?.authenticated) {
@@ -22,30 +28,20 @@ export default function Home() {
     }
   }, [authStatus, setLocation]);
 
-  const handleConnect = async (e: React.FormEvent) => {
+  const handleConnect = (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
     
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/github/auth/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-      
-      if (res.ok) {
+    connectGithub.mutate({ data: { token } }, {
+      onSuccess: (data) => {
+        queryClient.setQueryData(getGetGithubAuthStatusQueryKey(), data);
         toast({ title: "Connected", description: "Successfully authenticated with GitHub." });
-        window.location.href = "/dashboard";
-      } else {
-        const err = await res.json();
-        toast({ title: "Connection failed", description: err.error || "Invalid token.", variant: "destructive" });
+        setLocation("/dashboard");
+      },
+      onError: () => {
+        toast({ title: "Connection failed", description: "Invalid token or insufficient permissions.", variant: "destructive" });
       }
-    } catch (e) {
-      toast({ title: "Connection failed", description: "An unexpected error occurred.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   if (isLoadingAuth) return <div className="min-h-screen flex items-center justify-center bg-background"><Terminal className="h-8 w-8 animate-pulse text-muted-foreground" /></div>;
@@ -80,6 +76,7 @@ export default function Home() {
                   onChange={(e) => setToken(e.target.value)}
                   className="font-mono bg-background/50"
                   required
+                  autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
                   Needs <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">repo</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">user</code> scopes.{" "}
@@ -93,8 +90,8 @@ export default function Home() {
                   </a>.
                 </p>
               </div>
-              <Button type="submit" className="w-full font-medium" disabled={isLoading || !token}>
-                {isLoading ? "Connecting..." : "Connect GitHub"}
+              <Button type="submit" className="w-full font-medium" disabled={connectGithub.isPending || !token}>
+                {connectGithub.isPending ? "Connecting..." : "Connect GitHub"}
               </Button>
             </form>
           </CardContent>

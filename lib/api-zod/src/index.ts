@@ -1,1 +1,10 @@
 export * from "./generated/api";
+export type { GithubRepo } from "./generated/types/githubRepo";
+export type { GithubActivityEvent } from "./generated/types/githubActivityEvent";
+export type { GithubProfile } from "./generated/types/githubProfile";
+export type { GithubStats } from "./generated/types/githubStats";
+export type { GithubLanguageStat } from "./generated/types/githubLanguageStat";
+export type { GithubAuthStatus } from "./generated/types/githubAuthStatus";
+export type { HealthStatus } from "./generated/types/healthStatus";
+export type { ApiError } from "./generated/types/apiError";
+export type { SuccessResponse } from "./generated/types/successResponse";

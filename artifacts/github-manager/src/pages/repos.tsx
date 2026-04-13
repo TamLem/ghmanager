@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { 
   useGetGithubAuthStatus, 
@@ -8,6 +8,8 @@ import {
   getListGithubReposQueryKey,
   getGetGithubAuthStatusQueryKey
 } from "@workspace/api-client-react";
+import type { GithubRepo } from "@workspace/api-zod";
+import { UpdateGithubRepoBody } from "@workspace/api-zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
 import { Input } from "@/components/ui/input";
@@ -32,6 +34,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import type { z } from "zod";
+
+type RepoUpdate = z.infer<typeof UpdateGithubRepoBody>;
 
 const languageColors: Record<string, string> = {
   TypeScript: "#3178c6",
@@ -61,7 +66,7 @@ export default function Repositories() {
     }
   }, [auth, authError, setLocation]);
 
-  const { data: repos, isLoading } = useListGithubRepos({ sort: "updated", direction: "desc", per_page: 100 }, { query: { enabled: !!auth?.authenticated, queryKey: getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 }) }});
+  const { data: repos, isLoading } = useListGithubRepos({ sort: "updated", direction: "desc", per_page: 100 }, { query: { enabled: !!auth?.authenticated, queryKey: getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 }) } });
   const updateRepo = useUpdateGithubRepo();
   const createRepo = useCreateGithubRepo();
   const queryClient = useQueryClient();
@@ -76,12 +81,13 @@ export default function Repositories() {
     autoInit: true
   });
 
-  const handleUpdate = (repoId: number, owner: string, name: string, updates: any) => {
-    // Optimistic update
-    const prevRepos = queryClient.getQueryData<any[]>(getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 }));
+  const repoQueryKey = getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 });
+
+  const handleUpdate = (repoId: number, owner: string, name: string, updates: RepoUpdate) => {
+    const prevRepos = queryClient.getQueryData<GithubRepo[]>(repoQueryKey);
     if (prevRepos) {
-      queryClient.setQueryData(
-        getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 }), 
+      queryClient.setQueryData<GithubRepo[]>(
+        repoQueryKey,
         prevRepos.map(r => r.id === repoId ? { ...r, ...updates } : r)
       );
     }
@@ -92,9 +98,8 @@ export default function Repositories() {
       },
       onError: () => {
         toast({ title: "Update failed", variant: "destructive" });
-        // Revert on error
         if (prevRepos) {
-          queryClient.setQueryData(getListGithubReposQueryKey({ sort: "updated", direction: "desc", per_page: 100 }), prevRepos);
+          queryClient.setQueryData<GithubRepo[]>(repoQueryKey, prevRepos);
         }
       }
     });
@@ -108,8 +113,8 @@ export default function Repositories() {
         setNewForm({ name: "", description: "", private: false, autoInit: true });
         toast({ title: "Repository created", description: `Successfully created ${data.fullName}` });
       },
-      onError: (err: any) => {
-        toast({ title: "Creation failed", description: err.error || "Could not create repo", variant: "destructive" });
+      onError: (err: Error) => {
+        toast({ title: "Creation failed", description: err.message || "Could not create repo", variant: "destructive" });
       }
     });
   };

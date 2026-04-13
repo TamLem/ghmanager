@@ -7,7 +7,10 @@
  */
 
 export * from "./apiError";
+export * from "./connectGithubBody";
 export * from "./createGithubRepoBody";
+export * from "./getGithubActivityParams";
+export * from "./githubActivityEvent";
 export * from "./githubAuthStatus";
 export * from "./githubLanguageStat";
 export * from "./githubProfile";
@@ -17,5 +20,6 @@ export * from "./healthStatus";
 export * from "./listGithubReposDirection";
 export * from "./listGithubReposParams";
 export * from "./listGithubReposSort";
+export * from "./successResponse";
 export * from "./updateGithubProfileBody";
 export * from "./updateGithubRepoBody";

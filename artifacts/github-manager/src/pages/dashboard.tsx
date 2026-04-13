@@ -4,10 +4,12 @@ import {
   useGetGithubAuthStatus, 
   useGetGithubProfile, 
   useGetGithubStats,
+  useGetGithubActivity,
   useUpdateGithubProfile,
   getGetGithubProfileQueryKey,
   getGetGithubAuthStatusQueryKey,
-  getGetGithubStatsQueryKey
+  getGetGithubStatsQueryKey,
+  getGetGithubActivityQueryKey
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
@@ -18,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Users, GitFork, Star, BookMarked, MapPin, Link as LinkIcon, Building2, Twitter } from "lucide-react";
+import { Users, GitFork, Star, BookMarked, MapPin, Link as LinkIcon, Building2, Twitter, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 
@@ -34,6 +36,7 @@ export default function Dashboard() {
 
   const { data: profile, isLoading: isLoadingProfile } = useGetGithubProfile({ query: { enabled: !!auth?.authenticated, queryKey: getGetGithubProfileQueryKey() }});
   const { data: stats, isLoading: isLoadingStats } = useGetGithubStats({ query: { enabled: !!auth?.authenticated, queryKey: getGetGithubStatsQueryKey() }});
+  const { data: activity, isLoading: isLoadingActivity } = useGetGithubActivity({ per_page: 20 }, { query: { enabled: !!auth?.authenticated, queryKey: getGetGithubActivityQueryKey({ per_page: 20 }) }});
   
   const updateProfile = useUpdateGithubProfile();
   const queryClient = useQueryClient();
@@ -255,6 +258,46 @@ export default function Dashboard() {
             </div>
           </div>
         ) : null}
+
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Activity className="w-5 h-5 text-primary" /> Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingActivity ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : activity && activity.length > 0 ? (
+              <div className="divide-y divide-border">
+                {activity.map((event) => (
+                  <div key={event.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm text-foreground">{event.description}</span>
+                        <span className="text-muted-foreground text-xs">in</span>
+                        <a
+                          href={event.repoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary hover:underline font-mono truncate"
+                        >
+                          {event.repoName}
+                        </a>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(event.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground text-sm">No recent activity found.</div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </SidebarLayout>
   );

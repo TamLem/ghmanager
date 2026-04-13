@@ -6,7 +6,12 @@ import {
   BookMarked,
   LogOut
 } from "lucide-react";
-import { useGetGithubAuthStatus } from "@workspace/api-client-react";
+import { 
+  useGetGithubAuthStatus,
+  useDisconnectGithub,
+  getGetGithubAuthStatusQueryKey
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -21,22 +26,25 @@ import {
 } from "@/components/ui/sidebar";
 
 export function AppSidebar() {
-  const [location, setLocation] = useLocation();
-  const { data: authStatus } = useGetGithubAuthStatus();
+  const [, setLocation] = useLocation();
+  const [location] = useLocation();
+  const { data: authStatus } = useGetGithubAuthStatus({ query: { queryKey: getGetGithubAuthStatusQueryKey() } });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const disconnectGithub = useDisconnectGithub();
 
-  const handleDisconnect = async () => {
-    try {
-      const res = await fetch('/api/github/auth/disconnect', { method: 'POST' });
-      if (res.ok) {
+  const handleDisconnect = () => {
+    disconnectGithub.mutate(undefined, {
+      onSuccess: () => {
+        queryClient.setQueryData(getGetGithubAuthStatusQueryKey(), { authenticated: false, login: null, avatarUrl: null });
+        queryClient.clear();
         toast({ title: "Disconnected", description: "Successfully disconnected from GitHub." });
         setLocation("/");
-      } else {
+      },
+      onError: () => {
         toast({ title: "Error", description: "Failed to disconnect.", variant: "destructive" });
       }
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to disconnect.", variant: "destructive" });
-    }
+    });
   };
 
   return (
@@ -87,9 +95,14 @@ export function AppSidebar() {
                 )}
                 <span className="text-sm font-medium">{authStatus.login}</span>
               </div>
-              <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={handleDisconnect}>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start text-muted-foreground hover:text-foreground" 
+                onClick={handleDisconnect}
+                disabled={disconnectGithub.isPending}
+              >
                 <LogOut className="h-4 w-4 mr-2" />
-                Disconnect
+                {disconnectGithub.isPending ? "Disconnecting..." : "Disconnect"}
               </Button>
             </div>
           )}

@@ -13,6 +13,14 @@ export interface ApiError {
   error: string;
 }
 
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface ConnectGithubBody {
+  token: string;
+}
+
 export interface GithubAuthStatus {
   authenticated: boolean;
   /** @nullable */
@@ -122,6 +130,16 @@ export interface GithubStats {
   mostStarredRepo?: GithubRepo;
 }
 
+export interface GithubActivityEvent {
+  id: string;
+  /** @nullable */
+  type: string | null;
+  repoName: string;
+  repoUrl: string;
+  createdAt: string;
+  description: string;
+}
+
 export type ListGithubReposParams = {
   sort?: ListGithubReposSort;
   direction?: ListGithubReposDirection;
@@ -146,3 +164,7 @@ export const ListGithubReposDirection = {
   asc: "asc",
   desc: "desc",
 } as const;
+
+export type GetGithubActivityParams = {
+  per_page?: number;
+};

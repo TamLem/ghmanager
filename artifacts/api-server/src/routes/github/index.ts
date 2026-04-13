@@ -13,6 +13,10 @@ import {
   ListGithubReposResponse,
   UpdateGithubProfileResponse,
   UpdateGithubRepoResponse,
+  ConnectGithubBody,
+  GetGithubActivityQueryParams,
+  ConnectGithubResponse,
+  DisconnectGithubResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -106,20 +110,21 @@ router.get(
 router.post(
   "/github/auth/connect",
   async (req: Request, res: Response): Promise<void> => {
-    const { token } = req.body as { token?: string };
-    if (!token || typeof token !== "string") {
+    const parsed = ConnectGithubBody.safeParse(req.body);
+    if (!parsed.success) {
       res.status(400).json({ error: "token is required" });
       return;
     }
     try {
-      const octokit = createOctokit(token);
+      const octokit = createOctokit(parsed.data.token);
       const { data } = await octokit.rest.users.getAuthenticated();
-      req.session.githubToken = token;
-      res.json({
+      req.session.githubToken = parsed.data.token;
+      const response = ConnectGithubResponse.parse({
         authenticated: true,
         login: data.login,
         avatarUrl: data.avatar_url,
       });
+      res.json(response);
     } catch {
       res.status(401).json({ error: "Invalid GitHub token" });
     }
@@ -130,7 +135,8 @@ router.post(
   "/github/auth/disconnect",
   async (req: Request, res: Response): Promise<void> => {
     req.session.githubToken = undefined;
-    res.json({ success: true });
+    const response = DisconnectGithubResponse.parse({ success: true });
+    res.json(response);
   },
 );
 
@@ -384,6 +390,70 @@ router.get(
       mostStarredRepo: mostStarred ? mapRepo(mostStarred as Parameters<typeof mapRepo>[0]) : undefined,
     });
     res.json(response);
+  },
+);
+
+router.get(
+  "/github/activity",
+  async (req: Request, res: Response): Promise<void> => {
+    const octokit = getOctokitFromSession(req);
+    if (!octokit) {
+      res.status(401).json({ error: "Not authenticated with GitHub" });
+      return;
+    }
+    const params = GetGithubActivityQueryParams.safeParse(req.query);
+    const perPage = params.success && params.data.per_page ? Number(params.data.per_page) : 20;
+
+    const { data: user } = await octokit.rest.users.getAuthenticated();
+    const { data: events } = await octokit.rest.activity.listEventsForAuthenticatedUser({
+      username: user.login,
+      per_page: perPage,
+    });
+
+    type GithubEvent = typeof events[number];
+
+    function describeEvent(event: GithubEvent): string {
+      const payload = event.payload as Record<string, unknown>;
+      switch (event.type) {
+        case "PushEvent": {
+          const commits = (payload.commits as unknown[]) ?? [];
+          return `Pushed ${commits.length} commit${commits.length !== 1 ? "s" : ""}`;
+        }
+        case "PullRequestEvent":
+          return `${String(payload.action ?? "").replace(/_/g, " ")} pull request`;
+        case "IssuesEvent":
+          return `${String(payload.action ?? "").replace(/_/g, " ")} issue`;
+        case "CreateEvent":
+          return `Created ${String(payload.ref_type ?? "repository")}${payload.ref ? ` "${String(payload.ref)}"` : ""}`;
+        case "DeleteEvent":
+          return `Deleted ${String(payload.ref_type ?? "branch")} "${String(payload.ref ?? "")}"`;
+        case "ForkEvent":
+          return `Forked repository`;
+        case "WatchEvent":
+          return `Starred repository`;
+        case "IssueCommentEvent":
+          return `Commented on issue`;
+        case "PullRequestReviewEvent":
+          return `Reviewed pull request`;
+        case "ReleaseEvent":
+          return `${String(payload.action ?? "published")} release`;
+        case "MemberEvent":
+          return `${String(payload.action ?? "added")} member`;
+        default:
+          return event.type?.replace(/Event$/, "") ?? "Activity";
+      }
+    }
+
+    const mapped = events.map((event) => ({
+      id: event.id,
+      type: event.type ?? null,
+      repoName: event.repo?.name ?? "",
+      repoUrl: `https://github.com/${event.repo?.name ?? ""}`,
+      createdAt: event.created_at ?? new Date().toISOString(),
+      description: describeEvent(event),
+    }));
+
+    res.json(mapped);
   },
 );
 

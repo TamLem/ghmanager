@@ -26,6 +26,28 @@ export const GetGithubAuthStatusResponse = zod.object({
 });
 
 /**
+ * Connect with a GitHub Personal Access Token
+ * @summary Connect GitHub account
+ */
+export const ConnectGithubBody = zod.object({
+  token: zod.string(),
+});
+
+export const ConnectGithubResponse = zod.object({
+  authenticated: zod.boolean(),
+  login: zod.string().nullable(),
+  avatarUrl: zod.string().nullable(),
+});
+
+/**
+ * Removes the GitHub session token
+ * @summary Disconnect GitHub account
+ */
+export const DisconnectGithubResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
  * Returns the authenticated user's GitHub profile
  * @summary Get GitHub profile
  */
@@ -222,3 +244,23 @@ export const GetGithubStatsResponse = zod.object({
     })
     .optional(),
 });
+
+/**
+ * Returns recent public GitHub events for the authenticated user
+ * @summary Get recent activity feed
+ */
+export const GetGithubActivityQueryParams = zod.object({
+  per_page: zod.coerce.number().optional(),
+});
+
+export const GetGithubActivityResponseItem = zod.object({
+  id: zod.string(),
+  type: zod.string().nullable(),
+  repoName: zod.string(),
+  repoUrl: zod.string(),
+  createdAt: zod.string(),
+  description: zod.string(),
+});
+export const GetGithubActivityResponse = zod.array(
+  GetGithubActivityResponseItem,
+);
