@@ -79,9 +79,9 @@ export default function Home() {
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Needs <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">repo</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">user</code> scopes.{" "}
+                  Needs <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">repo</code>, <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">user</code>, and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">delete_repo</code> scopes.{" "}
                   <a 
-                    href="https://github.com/settings/tokens/new?scopes=repo,user" 
+                    href="https://github.com/settings/tokens/new?scopes=repo,user,delete_repo" 
                     target="_blank" 
                     rel="noreferrer"
                     className="text-primary hover:underline underline-offset-4"
