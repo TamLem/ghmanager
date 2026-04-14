@@ -104,16 +104,26 @@ router.get(
   "/github/auth/status",
   async (req: Request, res: Response): Promise<void> => {
     res.setHeader("Cache-Control", "no-store");
+    req.log.info(
+      {
+        hasSessionCookie: Boolean(req.headers.cookie?.includes("session=")),
+        hasSessionObject: Boolean(req.session),
+      },
+      "Checking GitHub auth status",
+    );
     const token = getGithubToken(req);
     if (!token) {
+      req.log.info("GitHub auth status: unauthenticated (no token)");
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
       return;
     }
     try {
       const octokit = createOctokit(token);
       const { data } = await octokit.rest.users.getAuthenticated();
+      req.log.info({ login: data.login }, "GitHub auth status: authenticated");
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: true, login: data.login, avatarUrl: data.avatar_url }));
     } catch {
+      req.log.warn("GitHub auth status check failed against GitHub API; clearing session token");
       clearGithubToken(req);
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
     }
@@ -132,6 +142,14 @@ router.get(
     const state = generateOauthState();
 
     const callbackUrl = getCallbackUrl(req);
+    req.log.info(
+      {
+        callbackUrl,
+        forwardedProto: req.headers["x-forwarded-proto"],
+        host: req.headers.host,
+      },
+      "Starting GitHub OAuth login redirect",
+    );
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: callbackUrl,
@@ -154,6 +172,14 @@ router.get(
     }
 
     const { code, state, error } = req.query;
+    req.log.info(
+      {
+        hasCode: typeof code === "string" && code.length > 0,
+        hasState: typeof state === "string" && state.length > 0,
+        oauthError: error ? String(error) : null,
+      },
+      "Received GitHub OAuth callback",
+    );
 
     if (error) {
       res.redirect(`/?error=${encodeURIComponent(String(error))}`);
@@ -161,6 +187,7 @@ router.get(
     }
 
     if (!state || !verifyOauthState(String(state))) {
+      req.log.warn("GitHub OAuth callback failed state verification");
       res.redirect("/?error=state_mismatch");
       return;
     }
@@ -187,6 +214,14 @@ router.get(
       });
 
       const tokenData = await tokenRes.json() as { access_token?: string; error?: string; error_description?: string };
+      req.log.info(
+        {
+          tokenExchangeStatus: tokenRes.status,
+          hasAccessToken: Boolean(tokenData.access_token),
+          oauthError: tokenData.error ?? null,
+        },
+        "Processed GitHub OAuth token exchange response",
+      );
 
       if (!tokenData.access_token) {
         const msg = tokenData.error_description ?? tokenData.error ?? "token_exchange_failed";
@@ -195,12 +230,20 @@ router.get(
       }
 
       setGithubToken(req, tokenData.access_token);
+      req.log.info(
+        {
+          hasSessionObject: Boolean(req.session),
+          hasSessionCookie: Boolean(req.headers.cookie?.includes("session=")),
+        },
+        "Stored GitHub token in session during callback",
+      );
       res.status(200).type("html").send(
         '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Signing in\u2026</title>' +
         '<script>window.location.replace("/")</script></head>' +
         '<body>Authentication successful. <a href="/">Click here if not redirected.</a></body></html>',
       );
     } catch {
+      req.log.error("GitHub OAuth callback failed unexpectedly");
       res.redirect("/?error=auth_failed");
     }
   },
