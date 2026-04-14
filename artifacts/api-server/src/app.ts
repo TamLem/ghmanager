@@ -7,6 +7,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Required when running behind a TLS-terminating reverse proxy so secure
+// cookies can be set correctly from x-forwarded-* headers.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
