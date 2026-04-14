@@ -7,6 +7,7 @@ import {
   randomBytes,
 } from "crypto";
 import type { Request } from "express";
+import { logger } from "./logger";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LEN = 12;
@@ -47,21 +48,47 @@ function getSecret(): string {
 }
 
 export function setGithubToken(req: Request, token: string): void {
-  if (req.session) req.session.githubToken = encryptToken(token, getSecret());
+  if (!req.session) {
+    logger.warn({ requestId: req.id }, "Attempted to set GitHub token without an active session object");
+    return;
+  }
+  const encrypted = encryptToken(token, getSecret());
+  req.session.githubToken = encrypted;
+  logger.info(
+    { requestId: req.id, encryptedLength: encrypted.length },
+    "Stored encrypted GitHub token in session",
+  );
 }
 
 export function getGithubToken(req: Request): string | null {
   const raw = req.session?.githubToken as string | undefined | null;
-  if (!raw) return null;
-  return decryptToken(raw, getSecret());
+  if (!raw) {
+    logger.debug({ requestId: req.id }, "No GitHub token found in session");
+    return null;
+  }
+  const token = decryptToken(raw, getSecret());
+  if (!token) {
+    logger.warn(
+      { requestId: req.id, encryptedLength: raw.length },
+      "Failed to decrypt GitHub token from session",
+    );
+    return null;
+  }
+  return token;
 }
 
 export function clearGithubToken(req: Request): void {
-  if (req.session) req.session.githubToken = null;
+  if (req.session) {
+    req.session.githubToken = null;
+    logger.info({ requestId: req.id }, "Cleared GitHub token from session");
+    return;
+  }
+  logger.warn({ requestId: req.id }, "Attempted to clear GitHub token without an active session object");
 }
 
 export function destroySession(req: Request): void {
   req.session = null;
+  logger.info({ requestId: req.id }, "Destroyed session");
 }
 
 /**

@@ -360,7 +360,15 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  // OAuth/session-backed flows rely on cookies. Use credentials=include by
+  // default so session cookies are consistently sent in both same-origin and
+  // cross-origin (CORS-enabled) deployments unless explicitly overridden.
+  const response = await fetch(input, {
+    ...init,
+    method,
+    headers,
+    credentials: init.credentials ?? "include",
+  });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

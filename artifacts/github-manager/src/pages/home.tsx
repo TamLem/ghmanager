@@ -33,10 +33,15 @@ export default function Home() {
     : null;
 
   useEffect(() => {
+    console.debug("[auth] Home auth status query result", {
+      authenticated: authStatus?.authenticated ?? null,
+      login: authStatus?.login ?? null,
+      isLoadingAuth,
+    });
     if (authStatus?.authenticated) {
       setLocation("/dashboard");
     }
-  }, [authStatus, setLocation]);
+  }, [authStatus, isLoadingAuth, setLocation]);
 
   useEffect(() => {
     if (errorMessage) {
@@ -45,6 +50,7 @@ export default function Home() {
   }, [errorMessage, toast]);
 
   const handleConnect = () => {
+    console.debug("[auth] Redirecting browser to OAuth login endpoint");
     window.location.href = "/api/github/auth/login";
   };
 
