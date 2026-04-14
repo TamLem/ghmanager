@@ -1,14 +1,13 @@
 import { Router, type IRouter } from "express";
 import type { Request, Response } from "express";
-import { randomBytes } from "crypto";
 import { getOctokitFromSession, createOctokit, requireGithubAuth } from "../../lib/github-client";
 import {
   setGithubToken,
   getGithubToken,
   clearGithubToken,
   destroySession,
-  setOauthState,
-  getAndClearOauthState,
+  generateOauthState,
+  verifyOauthState,
   getCallbackUrl,
 } from "../../lib/session";
 import {
@@ -129,8 +128,7 @@ router.get(
       res.status(503).send("GitHub OAuth is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.");
       return;
     }
-    const state = randomBytes(16).toString("hex");
-    setOauthState(req, state);
+    const state = generateOauthState();
 
     const callbackUrl = getCallbackUrl(req);
     const params = new URLSearchParams({
@@ -161,9 +159,7 @@ router.get(
       return;
     }
 
-    const savedState = getAndClearOauthState(req);
-
-    if (!state || !savedState || state !== savedState) {
+    if (!state || !verifyOauthState(String(state))) {
       res.redirect("/?error=state_mismatch");
       return;
     }
