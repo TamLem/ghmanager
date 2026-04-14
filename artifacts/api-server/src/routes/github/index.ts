@@ -194,7 +194,11 @@ router.get(
       }
 
       setGithubToken(req, tokenData.access_token);
-      res.redirect("/dashboard");
+      res.status(200).type("html").send(
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Signing in\u2026</title>' +
+        '<script>window.location.replace("/dashboard")</script></head>' +
+        "<body>Authentication successful. <a href=\"/dashboard\">Click here if not redirected.</a></body></html>",
+      );
     } catch {
       res.redirect("/?error=auth_failed");
     }
