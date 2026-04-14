@@ -103,6 +103,7 @@ function mapRepo(r: {
 router.get(
   "/github/auth/status",
   async (req: Request, res: Response): Promise<void> => {
+    res.setHeader("Cache-Control", "no-store");
     const token = getGithubToken(req);
     if (!token) {
       res.json(GetGithubAuthStatusResponse.parse({ authenticated: false, login: null, avatarUrl: null }));
@@ -196,8 +197,8 @@ router.get(
       setGithubToken(req, tokenData.access_token);
       res.status(200).type("html").send(
         '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Signing in\u2026</title>' +
-        '<script>window.location.replace("/dashboard")</script></head>' +
-        "<body>Authentication successful. <a href=\"/dashboard\">Click here if not redirected.</a></body></html>",
+        '<script>window.location.replace("/")</script></head>' +
+        '<body>Authentication successful. <a href="/">Click here if not redirected.</a></body></html>',
       );
     } catch {
       res.redirect("/?error=auth_failed");
